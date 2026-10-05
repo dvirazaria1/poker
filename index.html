@@ -1280,7 +1280,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 89</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 90</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -2014,7 +2014,20 @@
   // pull resolves it. In memory only -- after a refresh the app is going to try again regardless.
   let cloudSurfaceError = false;
   let cloudLastError = null;
-  let cloudLastRetryError = null;     // the last failure a push is quietly retrying (same shape)          // { table, code, message } of the failure the dot is showing
+  let cloudLastRetryError = null;     // the last failure a push is quietly retrying (same shape)
+  // Rows the server refused for what they contain, set aside so the rest keeps syncing. In memory
+  // only: a reload, a sign-in or a tap on the dot retries them, and so does any edit to the row.
+  // The row itself is never touched locally.
+  let cloudQuarantine = new Map(); // id -> { hash, table, code, message }
+  let cloudQuarantineRuns = 0;     // push re-runs spent setting rows aside this cycle (capped at 8)
+  function cloudQuarantinedIds() { return new Set(cloudQuarantine.keys()); }
+  function releaseCloudQuarantine() { cloudQuarantine = new Map(); cloudQuarantineRuns = 0; }
+  // Skipped only while unchanged; an edited row gets a fresh try.
+  function cloudQuarantineSkips(row, quarantined) {
+    const q = row && cloudQuarantine.get(String(row.id));
+    if (q && q.hash !== cloudRowHash(row)) { cloudQuarantine.delete(String(row.id)); return false; }
+    return !!q || cloudHeldByQuarantine(row, quarantined);
+  }          // { table, code, message } of the failure the dot is showing
   let lastPushedRows = null; // the diff baseline: what the server is known to hold
   // INSERT ... DO NOTHING cannot tell a newly-created row from an existing row it ignored. Keep
   // this account-scoped marker in memory until a pull rebuilds the baseline, then retry the local
@@ -2068,14 +2081,19 @@
     // cloudOutboxSignal, not the bare pending-id count: a buy-in waiting on a scheduled/backed-off
     // push touches no group collection at all, so state.cloudPendingIds alone would undercount it
     // and the dot would lie and say "synced" while a retry is still sitting on the clock.
-    const info = { syncing: cloudPushing, error: cloudSurfaceError, pendingCount: cloudOutboxSignal() };
+    const info = { syncing: cloudPushing, error: cloudSurfaceError || cloudQuarantine.size > 0, pendingCount: cloudOutboxSignal() };
     const label = cloudSyncLabel(info);
     const kind = info.syncing ? "syncing" : info.error ? "error" : info.pendingCount > 0 ? "waiting" : "synced";
-    setCloudSync(kind, label, kind === "error" ? cloudErrorDetail(cloudLastError)
+    setCloudSync(kind, label, kind === "error" ? [cloudErrorDetail(cloudLastError), cloudQuarantineDetail()].filter(Boolean).join("\n")
       : kind === "waiting" ? cloudWaitingDetail() : "");
   }
   // What a grey dot is waiting on: how many records are still unconfirmed, whether a push is on
   // the clock (and its attempt count), and the error it is retrying, if any.
+  function cloudQuarantineDetail() {
+    if (!cloudQuarantine.size) return "";
+    return "set aside: " + Array.from(cloudQuarantine.entries())
+      .map(([id, q]) => [q.table, id.slice(0, 8), q.code].filter(Boolean).join(" ")).join(", ");
+  }
   function cloudWaitingDetail() {
     const pending = (state.cloudPendingIds || []).length;
     const parts = [];
@@ -2165,7 +2183,10 @@
   // push that is currently scheduled or in flight (which has not updated that list yet). Feeds
   // cloudReconnectOrder so a reconnect never pulls a stale server view on top of an unsent write.
   function cloudOutboxSignal() {
-    return (state.cloudPendingIds || []).length + (cloudPushTimer || cloudPushing ? 1 : 0);
+    // A set-aside row is not waiting for the network; it is shown red instead.
+    const quarantined = cloudQuarantinedIds();
+    const pending = (state.cloudPendingIds || []).filter(id => !quarantined.has(String(id))).length;
+    return pending + (cloudPushTimer || cloudPushing ? 1 : 0);
   }
   // Flushes the outbox (if there is one) before pulling -- the same "push wins the race" rule
   // enterCloudMode uses unconditionally at boot, applied here as the cheaper, conditional version
@@ -2175,6 +2196,7 @@
   // "push before pull on reconnect" both point.
   function cloudRetryNow() {
     if (!cloudMode()) return;
+    releaseCloudQuarantine(); // a tap, a reconnect or coming back: give set-aside rows another try
     syncCloudGameChannel(); // a channel that reported an error is recreated here (no-op when healthy)
     syncCloudAccountChannel();
     if (cloudReconnectOrder(cloudOutboxSignal()) === "pull-then-push") { pullCloud(); return; }
@@ -2318,14 +2340,16 @@
     // server's rows with it.
     const editable = new Set((next.games || []).map(row => String(row.id)));
     const isEditable = row => editable.has(String(row.game_id || ""));
+    const quarantined = cloudQuarantinedIds();
     try {
       for (const pair of CLOUD_TABLES) {
         if (!pushIsCurrent()) return;
         // gamesClosed IS the frozen set, so it keeps its rows; everything else drops the rows of
         // a game the server already closed, and never deletes them either.
-        const rows = pair[0] === "gamesClosed"
+        const rows = (pair[0] === "gamesClosed"
           ? (next[pair[0]] || []).filter(row => !foreignClosed.has(String(row.id)))
-          : (next[pair[0]] || []).filter(notFrozen);
+          : (next[pair[0]] || []).filter(notFrozen))
+          .filter(row => !cloudQuarantineSkips(row, quarantined));
         const diff = diffCollections(previous[pair[0]] || [], rows, "id");
         // diff.deletes is deliberately not applied here: none of the group tables has a DELETE
         // policy — removal is a soft column (deleted_at / status), which the upsert carries.
@@ -2351,7 +2375,7 @@
           if (CLOUD_INSERT_ONLY[pair[0]]) {
             const result = await supabase.from(pair[1]).upsert(upserts, { onConflict: "id", ignoreDuplicates: true });
             if (!pushIsCurrent()) return;
-            if (result && result.error) throw tagCloudError(result.error, pair[1]);
+            if (result && result.error) throw await cloudNameRefusedRow(result.error, pair[1], upserts);
           } else {
             // Rows the server is known to hold. For the two collections that share the `games`
             // table the baseline is both halves; a gamesClosed row is never new — the games
@@ -2414,6 +2438,18 @@
       if (!pushIsCurrent()) return;
       lastPushedRows = confirmed;
       clearCloudPending(confirmed); // whatever DID land stops being pending; the rest stays protected
+      // One row refused for what it contains: set it aside and run the push again without it (and
+      // without its children), instead of letting it block every write that comes after it.
+      if (isRowSpecificRefusal(e) && cloudQuarantineRuns < 8) {
+        const row = e.cloudRow;
+        cloudQuarantine.set(String(row.id), { hash: cloudRowHash(row), table: e.cloudTable || "",
+          code: String(e.code || ""), message: String(e.message || "").slice(0, 120) });
+        cloudQuarantineRuns++;
+        console.warn("cloud push: set aside", e.cloudTable, row.id, e.code, e.message);
+        clearTimeout(cloudPushTimer);
+        cloudPushTimer = setTimeout(() => { cloudPushTimer = null; if (pushIsCurrent()) pushCloud(); }, 0);
+        return;
+      }
       // Network/timeout/5xx is the server's problem (or no server reached at all) and is worth
       // retrying with bounded exponential backoff + full jitter — nothing here ever gives up, it
       // only waits longer, so a buy-in typed on a flaky connection keeps trying on its own even if
@@ -2446,6 +2482,7 @@
     cloudSurfaceError = false;
     cloudLastError = null;
     cloudLastRetryError = null;
+    cloudQuarantineRuns = 0;
     lastPushedRows = confirmed;
     clearCloudPending(confirmed);
     dirtyUntil = 0;
@@ -2993,6 +3030,7 @@
   // version used once the session is already live and the in-memory guards are trustworthy again.
   function enterCloudMode() {
     if (!supabase || !authUser) return;
+    releaseCloudQuarantine();
     clearTimeout(saveTimer);
     saveTimer = null;
     gameDoc = null;
@@ -5534,6 +5572,28 @@
       server.forEach(row => { if (row && row.id && !dirty.has(String(row.id))) settled.add(String(row.id)); });
     });
     return (pending || []).map(String).filter(id => writable.has(id) && !settled.has(id));
+  }
+  // ----- push quarantine (docs/superpowers/plans/2026-10-05-push-quarantine.md) -----
+  // A row's identity across push runs: its content without updated_at, which a re-save bumps.
+  function cloudRowHash(row) {
+    const copy = { ...(row || {}) };
+    delete copy.updated_at;
+    return JSON.stringify(copy, Object.keys(copy).sort());
+  }
+  // Worth setting one row aside only when the server refused THAT row for what it contains: RLS
+  // (42501), a constraint (23xxx) or a bad value (22P02). An expired session or a bare HTTP status
+  // says nothing about the row, and a batch whose culprit was not found names no row at all.
+  function isRowSpecificRefusal(error) {
+    const e = error || {};
+    if (!e.cloudRow || !e.cloudRow.id) return false;
+    const code = String(e.code || "");
+    return code === "42501" || code === "22P02" || /^23/.test(code);
+  }
+  // A child of a set-aside parent would only fail its foreign key: hold it for this run instead.
+  const CLOUD_PARENT_COLUMNS = ["group_id", "game_id", "participant_id", "from_participant_id", "to_participant_id"];
+  function cloudHeldByQuarantine(row, quarantinedIds) {
+    if (!row || !quarantinedIds || !quarantinedIds.size) return false;
+    return CLOUD_PARENT_COLUMNS.some(col => row[col] && quarantinedIds.has(String(row[col])));
   }
   function keepLocalIdsFor(pending, unconfirmedIds) {
     const ids = new Set((Array.isArray(unconfirmedIds) ? unconfirmedIds : []).map(String));
