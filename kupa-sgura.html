@@ -2787,6 +2787,9 @@
     }
     if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
       cloudGameChannelBroken = true;
+      // iOS drops sockets of a backgrounded app as a matter of course; coming back recreates the
+      // channel (cloudRetryNow) and catches up. Only a drop the person could actually see is red.
+      if (document.hidden) return;
       noteCloudReadFailure([describeCloudError(tagCloudError({ code: String(status), message: "live updates are down" }, "realtime"))]);
     }
   }
@@ -9534,10 +9537,13 @@
     // No session but a client is reachable: offer a way back in without wiping the local name/
     // history. The pencil edits either the local name or the signed-in profiles row; this button
     // stays sign-out only.
-    const canSignIn = !authUser && !!supabase;
+    // A session whose profile could not be ensured is still a session: it is not offered a second
+    // sign-in, and it must be possible to sign out of it.
+    const sessionHeld = !!authUser || !!authProfileFailedUserId;
+    const canSignIn = !sessionHeld && !!supabase;
     document.getElementById("setSignInNote").hidden = !canSignIn;
     document.getElementById("setSignInBtn").hidden = !canSignIn;
-    document.getElementById("setSwapBtn").hidden = !authUser;
+    document.getElementById("setSwapBtn").hidden = !sessionHeld;
     renderAuthProfileState();
     document.getElementById("setSwapBtn").textContent = "התנתקות";
     // Danger zone: account deletion only makes sense for a signed-in account.

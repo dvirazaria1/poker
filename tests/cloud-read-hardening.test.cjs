@@ -133,6 +133,7 @@ test('realtime status: SUBSCRIBED runs a catch-up pull, a failure is surfaced an
     cloudGameEventTimer: null,
     scheduleCloudGamePull: () => calls.push('catchup'),
     noteCloudReadFailure: failures => calls.push('red:' + failures[0].code),
+    document: { hidden: false },
   });
   const source = ['syncCloudGameChannel', 'onCloudGameChannelStatus', 'leaveCloudGameChannel'].map(fn).join('\n');
   vm.runInContext(source + '\nvar cloudGameChannel = null, cloudGameChannelId = "", cloudGameChannelBroken = false;', context);

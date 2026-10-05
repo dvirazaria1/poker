@@ -206,10 +206,11 @@ test('refreshSettings branches sign-in visibility and reserves the swap button f
   const start = appScript.indexOf('function refreshSettings()');
   const close = appScript.indexOf('\n  }', start);
   const body = appScript.slice(start, close);
-  assert.match(body, /!authUser && !!supabase/, 'no-session-but-available branch must check both authUser and supabase');
+  assert.match(body, /const canSignIn = !sessionHeld && !!supabase;/, 'no-session-but-available branch must check both the session and supabase');
   assert.match(body, /setSignInNote"\)\.hidden = !canSignIn/);
   assert.match(body, /setSignInBtn"\)\.hidden = !canSignIn/);
-  assert.match(body, /setSwapBtn"\)\.hidden = !authUser/);
+  assert.match(body, /const sessionHeld = !!authUser \|\| !!authProfileFailedUserId;/);
+  assert.match(body, /setSwapBtn"\)\.hidden = !sessionHeld/);
   assert.match(body, /setSwapBtn"\)\.textContent = "התנתקות"/);
 });
 
