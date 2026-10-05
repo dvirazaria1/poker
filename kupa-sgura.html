@@ -1263,7 +1263,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 86</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 87</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -1996,7 +1996,8 @@
   // A non-retryable push failure (RLS/constraint/4xx) is showing on the dot until the next push or
   // pull resolves it. In memory only -- after a refresh the app is going to try again regardless.
   let cloudSurfaceError = false;
-  let cloudLastError = null;          // { table, code, message } of the failure the dot is showing
+  let cloudLastError = null;
+  let cloudLastRetryError = null;     // the last failure a push is quietly retrying (same shape)          // { table, code, message } of the failure the dot is showing
   let lastPushedRows = null; // the diff baseline: what the server is known to hold
   // INSERT ... DO NOTHING cannot tell a newly-created row from an existing row it ignored. Keep
   // this account-scoped marker in memory until a pull rebuilds the baseline, then retry the local
@@ -2053,7 +2054,18 @@
     const info = { syncing: cloudPushing, error: cloudSurfaceError, pendingCount: cloudOutboxSignal() };
     const label = cloudSyncLabel(info);
     const kind = info.syncing ? "syncing" : info.error ? "error" : info.pendingCount > 0 ? "waiting" : "synced";
-    setCloudSync(kind, label, kind === "error" ? cloudErrorDetail(cloudLastError) : "");
+    setCloudSync(kind, label, kind === "error" ? cloudErrorDetail(cloudLastError)
+      : kind === "waiting" ? cloudWaitingDetail() : "");
+  }
+  // What a grey dot is waiting on: how many records are still unconfirmed, whether a push is on
+  // the clock (and its attempt count), and the error it is retrying, if any.
+  function cloudWaitingDetail() {
+    const pending = (state.cloudPendingIds || []).length;
+    const parts = [];
+    if (pending) parts.push("pending " + pending + " (" + (state.cloudPendingIds || []).slice(0, 3).map(id => String(id).slice(0, 8)).join(", ") + ")");
+    if (cloudPushTimer || cloudPushing) parts.push("push queued, attempt " + cloudPushAttempt);
+    const retry = cloudErrorDetail(cloudLastRetryError);
+    return parts.join(" · ") + (retry ? "\nretrying: " + retry : "");
   }
 
   // Games the server is already known to hold. A closed game only goes up when the server saw it
@@ -2387,6 +2399,8 @@
       // history entry stays exactly where it is, same "server wins" rule as always.
       if (classifyCloudError(e) === "retry") {
         cloudSurfaceError = false;
+        // Kept for the dot's tap detail: a grey "waiting" that never clears has to say why.
+        cloudLastRetryError = describeCloudError(e) || { table: "", code: "", message: String((e && (e.name || e.message)) || e).slice(0, 120) };
         const delay = cloudBackoffDelay(cloudPushAttempt, Math.random());
         cloudPushAttempt++;
         clearTimeout(cloudPushTimer);
@@ -2407,6 +2421,7 @@
     cloudPushAttempt = 0;
     cloudSurfaceError = false;
     cloudLastError = null;
+    cloudLastRetryError = null;
     lastPushedRows = confirmed;
     clearCloudPending(confirmed);
     dirtyUntil = 0;
@@ -2971,6 +2986,7 @@
     cloudPushing = false;
     cloudPushAttempt = 0;
     cloudSurfaceError = false;
+    cloudLastRetryError = null;
     state.cloudPendingIds = [];
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
     lastPushedRows = null;
@@ -5515,7 +5531,8 @@
   function describeCloudError(error) {
     if (!error) return null;
     const table = error.cloudTable || "";
-    const code = error.code || (error.status ? String(error.status) : "");
+    const code = error.code || (error.status ? String(error.status) : "")
+      || (/^(TypeError|ReferenceError|SyntaxError)$/.test(error.name || "") ? error.name : "");
     const message = String(error.message || "").slice(0, 120);
     if (!table && !code && !message) return null;
     return { table, code, message, row: describeCloudRow(error.cloudRow) };
@@ -5605,7 +5622,11 @@
     const code = String(e.code || "");
     if (code && (CLOUD_SURFACE_CODES[code] || /^(23|42)/.test(code))) return "surface"; // integrity / access-rule classes
     const text = String(e.message || e.name || "");
-    if (/network|fetch|timeout|abort|offline/i.test(text)) return "retry";
+    // Safari's failed fetch is "TypeError: Load failed"; Chrome's is "Failed to fetch".
+    if (/network|fetch|timeout|abort|offline|load failed/i.test(text)) return "retry";
+    // Any other TypeError/ReferenceError is a bug in this file: retrying it forever only hid it
+    // behind a grey dot. Surface it, by name, like a refused write.
+    if (e.name === "TypeError" || e.name === "ReferenceError" || e.name === "SyntaxError") return "surface";
     return "retry"; // an unrecognized shape defaults to safety, same as the old universal retry
   }
   // The four honest sync-dot states, and nothing else — an in-flight push always wins the label

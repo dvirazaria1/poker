@@ -22,3 +22,12 @@ test("debt payments and child deletes name their own table", () => {
   assert.doesNotMatch(html, /\.eq\("id", payment\.id\);\s+if \(!pushIsCurrent\(\)\) return;\s+if \(result && result\.error\) throw tagCloudError\(result\.error, pair\[1\]\)/);
   assert.match(body("pushCloudGameDeletes"), /tagCloudError\(result\.error, table\)/);
 });
+
+test("a grey waiting dot explains itself, and a code error is surfaced instead of retried forever", () => {
+  assert.match(body("refreshSyncDot"), /kind === "waiting" \? cloudWaitingDetail\(\)/);
+  const ctx = require("node:vm").createContext({ CLOUD_SURFACE_CODES: {} });
+  require("node:vm").runInContext(body("classifyCloudError") + "\n  }", ctx);
+  assert.equal(ctx.classifyCloudError({ name: "TypeError", message: "Load failed" }), "retry");
+  assert.equal(ctx.classifyCloudError({ name: "TypeError", message: "Cannot read properties of undefined (reading 'id')" }), "surface");
+  assert.equal(ctx.classifyCloudError({ message: "something else" }), "retry");
+});
