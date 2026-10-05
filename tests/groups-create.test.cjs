@@ -143,7 +143,7 @@ test('the group card row opens its preview and is keyboard-accessible, without a
   assert.match(source, /if \(e\.key === "Enter" \|\| e\.key === " "\) \{ e\.preventDefault\(\); activate\(\); \}/);
   assert.doesNotMatch(source, /games-card-toggle/);
   assert.doesNotMatch(source, /הרחב/);
-  const sectionSource = sourceBetween('  function renderGroupsSection(', '  function enterActiveGame(');
+  const sectionSource = sourceBetween('  function renderGroupsSection(', '  function renderArchivedGroupsSection(');
   assert.match(sectionSource, /onOpen: \(\) => openGroupPreview\(groupId\)/);
 });
 

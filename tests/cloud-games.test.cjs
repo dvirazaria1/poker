@@ -450,21 +450,6 @@ test('buildHistoryEntryFromCloud rebuilds the very HistoryEntry the local close 
 
 // ---------- the single open slot ----------
 
-test('the open-game slot rule: empty or closed loads, same id replaces, a different open game is kept', () => {
-  const context = load();
-  const incoming = { gameId: GAME };
-  const other = { gameId: GAME2 };
-  const pick = (local, games) => runJSON(`pickCloudOpenGame(${lit(local)}, ${lit(games)})`, context);
-
-  assert.deepEqual(pick({ gameId: '', phase: 'closed', players: [] }, [incoming]), { action: 'load', game: incoming });
-  assert.deepEqual(pick({ gameId: GAME2, phase: 'closed', players: [] }, [incoming]), { action: 'load', game: incoming });
-  assert.deepEqual(pick({ gameId: GAME2, phase: 'active', example: true, players: [] }, [incoming]), { action: 'load', game: incoming });
-  assert.deepEqual(pick({ gameId: GAME, phase: 'active', players: [] }, [incoming]), { action: 'load', game: incoming });
-  // Single-slot limitation, documented on purpose: local wins and the server game waits.
-  assert.deepEqual(pick({ gameId: GAME2, phase: 'active', players: [] }, [incoming]), { action: 'keep', game: null });
-  assert.deepEqual(pick({ gameId: GAME2, phase: 'active', players: [] }, [other]), { action: 'load', game: other });
-  assert.deepEqual(pick({ gameId: '', phase: 'closed', players: [] }, []), { action: 'keep', game: null });
-});
 
 test('shouldApplyIncomingGame never yanks the screen out from under an active input', () => {
   const context = load();
@@ -474,9 +459,12 @@ test('shouldApplyIncomingGame never yanks the screen out from under an active in
   assert.equal(call(local, { gameId: GAME }, false), true);
   assert.equal(call(local, { gameId: GAME }, true), false, 'park it for focusout instead');
   assert.equal(call(local, null, false), false);
-  assert.equal(call(local, { gameId: GAME2 }, false), false, 'a different table never overwrites this one');
+  // Round 2: an update replaces only its own slot, so another table being current is no reason to wait,
+  // and typing at THIS table only parks updates to this table.
+  assert.equal(call(local, { gameId: GAME2 }, false), true);
+  assert.equal(call(local, { gameId: GAME2 }, true), true);
   assert.equal(call({ gameId: GAME2, phase: 'closed', example: false }, { gameId: GAME }, false), true);
-  assert.equal(call({ gameId: GAME2, phase: 'active', example: true }, { gameId: GAME }, false), true);
+  assert.equal(call({ gameId: GAME2, phase: 'active', example: true }, { gameId: GAME }, false), false, 'demo data never takes a real table');
 });
 
 // ---------- merge ----------
@@ -524,11 +512,14 @@ test('mergeCloudIntoState without any game keys is exactly the phase 2a merge', 
   assert.deepEqual(merged.settlementStatuses, state.settlementStatuses);
 });
 
-test('a pulled open game replaces the slot, players, settlementStatuses and all', () => {
+test('a pulled open table replaces its own slot in state.games (players, settlementStatuses and all), and the mirror follows', () => {
   const context = load();
+  const take = name => { const s = html.indexOf('  function ' + name + '('); return html.slice(s, html.indexOf('\n  }\n', s) + 4); };
+  vm.runInContext(['currentGameSlot', 'syncCurrentGameMirror', 'mergeIncomingSlot', 'replaceGameSlot'].map(take).join('\n'), context);
+  const stale = { gameId: GAME, phase: 'active', players: [], settlementStatuses: {}, groupId: null, startedAt: null, leaderRef: null };
   const state = {
     gameId: GAME, phase: 'active', players: [], settlementStatuses: {}, groupId: null, startedAt: null,
-    leaderRef: null, history: [], debts: [], groups: [], groupMembers: [], invites: [], friendships: [],
+    leaderRef: null, history: [], debts: [], groups: [], groupMembers: [], invites: [], friendships: [], games: [stale],
   };
   const incoming = {
     gameId: GAME, phase: 'settlement', groupId: GR1, startedAt: '2026-09-06T19:00:00.000Z',
@@ -536,10 +527,12 @@ test('a pulled open game replaces the slot, players, settlementStatuses and all'
     players: [{ id: PL1, name: 'דביר', buyins: [50], entryLog: [], cashout: 50, status: 'active', exitedAt: null, guestId: G1, memberId: M1, userId: P1 }],
     settlementStatuses: { k: true },
   };
-  const merged = runJSON(`mergeCloudIntoState(${lit(state)}, { groups: [], groupMembers: [], invites: [], friendships: [], game: ${lit(incoming)} }, {})`, context);
+  // F1 regression: the slot itself must change, not just the singular fields a later normalize would overwrite.
+  const merged = runJSON(`syncCurrentGameMirror(mergeCloudIntoState(${lit(state)}, { groups: [], groupMembers: [], invites: [], friendships: [], gameSlot: ${lit(incoming)} }, {}))`, context);
+  assert.equal(merged.games.length, 1);
+  assert.equal(merged.games[0].players.length, 1);
   assert.equal(merged.phase, 'settlement');
   assert.equal(merged.groupId, GR1);
-  assert.equal(merged.players.length, 1);
   assert.deepEqual(merged.settlementStatuses, { k: true });
   assert.equal(merged.example, false);
 });
@@ -647,4 +640,18 @@ test('the sync dot says it is syncing during a push, via the honest four-state l
   assert.ok(!html.includes('sb_secret_'));
   assert.ok(!html.includes('service_role'));
   assert.ok(!/userId: (authUser|session|user)\b/.test(appScript), 'a userId only ever arrives as profile_id');
+});
+
+test('a table the server removed is not resurrected by normalize from the stale mirror (Round 2 review M1)', () => {
+  const out = JSON.parse(vm.runInNewContext(
+    normalizeCoreSource + '\n' + normalizeGroupsSource + '\nJSON.stringify(normalize(syncCurrentGameMirror(input)))',
+    { input: { gameId: GAME, phase: 'active', players: [{ id: PL1, name: 'דביר', buyins: [50] }], games: [], history: [], debts: [] },
+      crypto: require('node:crypto').webcrypto, newId: () => 'stub-new-id' }
+  ));
+  assert.deepEqual(out.games, [], 'the merged games list is authoritative once the mirror is refreshed first');
+  assert.equal(out.phase, 'closed');
+});
+
+test('boot points at the one open table when the pointer names none (M9)', () => {
+  assert.match(html, /if \(!currentGameSlot\(state\) && openGameSlots\(state\)\.length === 1\) state = selectGameSlot\(state, openGameSlots\(state\)\[0\]\.gameId\);\s+appView = initialAppView\(state\);/);
 });

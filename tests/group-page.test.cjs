@@ -137,7 +137,7 @@ test('the primary action reads summary.hasActiveGame and summary.activeGamePhase
   assert.match(source, /summary\.activeGamePhase === "settlement"/);
   assert.match(source, /כנס לשולחן/);
   assert.match(source, /המשך סגירה/);
-  assert.match(source, /continueCurrentGame/);
+  assert.match(source, /enterActiveGame\(groupSlot\.gameId\)/);
 });
 
 test('the primary action renders "התחל משחק" disabled with the right quiet reason per gate.reason', () => {

@@ -14,7 +14,7 @@ let seq = 0;
 const ctx = vm.createContext({ crypto: { randomUUID: () => "new-" + (++seq) } });
 vm.runInContext(["hasOpenPhase", "isGameOpen", "isEmptyOpenGame", "currentGameSlot", "syncCurrentGameMirror", "newId",
   "openGameSlots", "groupGameSlot", "openNewGameSlot", "selectGameSlot", "canStartGroupGame", "initialAppView",
-  "mergeOpenGameSlots", "replaceGameSlot"].map(fn).join("\n"), ctx);
+  "mergeIncomingSlot", "mergeOpenGameSlots", "replaceGameSlot"].map(fn).join("\n"), ctx);
 const slot = (id, groupId, n = 1, phase = "active") => ({ gameId: id, phase, groupId,
   players: Array.from({ length: n }, (_, i) => ({ id: id + i })), startedAt: null, leaderRef: null, settlementStatuses: {} });
 
@@ -60,10 +60,56 @@ test("the pull keeps every server table, keeps unsynced local ones, drops tables
   assert.equal(merged.find(g => g.gameId === "a").players.length, 4);
 });
 
-test("a realtime snapshot replaces its own slot and nothing else", () => {
+test("a realtime snapshot replaces its own slot and nothing else, and never re-adds a table gone here", () => {
   const out = ctx.replaceGameSlot([slot("a", "g1", 1), slot("b", null, 1)], slot("a", "g1", 5));
   assert.equal(out.length, 2);
   assert.equal(out[0].players.length, 5);
   assert.equal(out[1].gameId, "b");
-  assert.equal(ctx.replaceGameSlot([slot("b", null)], slot("c", null)).length, 2);
+  assert.equal(ctx.replaceGameSlot([slot("b", null)], slot("c", null)).length, 1, "closed/reset here: not re-added (M6)");
+});
+
+test("an open table's paid marks survive a server snapshot that carries none, per table (M2)", () => {
+  const a = { ...slot("a", "g1", 2, "settlement"), settlementStatuses: { "x>y:50": true } };
+  const b = { ...slot("b", null, 2, "settlement"), settlementStatuses: { "p>q:20": true } };
+  const fromServer = id => ({ ...slot(id, null, 3, "settlement"), settlementStatuses: null });
+  const viaRealtime = ctx.replaceGameSlot([a, b], fromServer("a"));
+  assert.deepEqual(viaRealtime[0].settlementStatuses, { "x>y:50": true });
+  assert.deepEqual(viaRealtime[1].settlementStatuses, { "p>q:20": true });
+  const viaPull = ctx.mergeOpenGameSlots([a, b], [fromServer("a"), fromServer("b")], {});
+  assert.deepEqual(viaPull.find(g => g.gameId === "b").settlementStatuses, { "p>q:20": true });
+  const explicit = ctx.replaceGameSlot([a], { ...fromServer("a"), settlementStatuses: {} });
+  assert.deepEqual(explicit[0].settlementStatuses, {}, "an explicit server map still wins");
+});
+
+test("a table reset here this session is not brought back by the pull (M8)", () => {
+  const merged = ctx.mergeOpenGameSlots([], [slot("a", "g1"), slot("b", null)], { discarded: new Set(["a"]) });
+  assert.deepEqual(merged.map(g => g.gameId), ["b"]);
+});
+
+test("the dashboard lists every open table, current first; a group reports its own table beside another", () => {
+  const c2 = vm.createContext({ crypto: { randomUUID: () => "x" } });
+  vm.runInContext(["hasOpenPhase", "isGameOpen", "openGameSlots", "getActiveGameSummaries", "activeGameSummary"].map(fn).join("\n"), c2);
+  const st = { gameId: "b", games: [slot("a", "g1", 2), slot("b", null, 1), slot("e", "g9", 0)] };
+  const out = JSON.parse(vm.runInContext("JSON.stringify(getActiveGameSummaries(" + JSON.stringify(st) + ", [{ id: 'g1', name: 'G1' }]))", c2));
+  assert.deepEqual(out.map(s => s.gameId), ["b", "a"]);
+  assert.equal(out[1].title, "G1");
+  const summary = fn("getGroupSummary");
+  assert.match(summary, /\(Array\.isArray\(c\.games\) \? c\.games : \[c\.currentGame\]\)/);
+});
+
+test("entering a table clears the per-table UI before moving the pointer", () => {
+  const enter = fn("enterActiveGame");
+  assert.ok(enter.indexOf("resetTableUi()") < enter.indexOf("selectGameSlot(state, id)"));
+  assert.match(fn("resetTableUi"), /clearCloseHold\(\);\s+clearFinishGameHold\(\);/);
+  assert.match(fn("render"), /if \(\(appView === "game" \|\| appView === "settle"\) && !currentGameSlot\(state\)\) appView = "games";/);
+});
+
+test("one realtime channel per open table: current first, cloud ids only, at most four", () => {
+  const c3 = vm.createContext({ isCloudId: id => /^[0-9a-f-]{36}$/.test(id) });
+  vm.runInContext(["hasOpenPhase", "isGameOpen", "openGameSlots", "cloudChannelGameIds"].map(fn).join("\n") + "\nvar CLOUD_GAME_CHANNEL_CAP = 4;", c3);
+  const u = n => "0000000" + n + "-0000-4000-8000-000000000000";
+  const st = { gameId: u(5), games: [1, 2, 3, 4, 5, 6].map(n => slot(u(n), null)).concat([slot("legacy-x", null)]) };
+  const ids = JSON.parse(vm.runInContext("JSON.stringify(cloudChannelGameIds(" + JSON.stringify(st) + "))", c3));
+  assert.deepEqual(ids, [u(5), u(1), u(2), u(3)]);
+  assert.deepEqual(JSON.parse(vm.runInContext("JSON.stringify(cloudChannelGameIds({ example: true, games: [] }))", c3)), []);
 });

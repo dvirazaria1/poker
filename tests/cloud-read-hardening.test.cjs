@@ -118,38 +118,41 @@ test('the realtime read uses the full pull trust predicate and drops a result fo
 test('realtime status: SUBSCRIBED runs a catch-up pull, a failure is surfaced and the channel is recreated', () => {
   const calls = [];
   let created = 0;
+  const made = [];
   const makeChannel = () => {
     const ch = { on() { return ch; }, subscribe(cb) { ch.cb = cb; return ch; } };
     created++;
+    made.push(ch);
     return ch;
   };
+  const GAME = '11111111-1111-4111-8111-111111111111';
   const supabase = { channel: () => makeChannel(), removeChannel: () => calls.push('remove') };
   const context = pureContext({
     supabase,
     authUser: { id: 'me' },
-    state: { example: false, phase: 'active', gameId: '11111111-1111-4111-8111-111111111111' },
+    state: { example: false, gameId: GAME, games: [{ gameId: GAME, phase: 'active', players: [{ id: 'p' }] }] },
     isCloudId: () => true,
+    openGameSlots: s => (s.games || []).filter(g => g.players && g.players.length),
     clearTimeout,
-    cloudGameEventTimer: null,
     scheduleCloudGamePull: () => calls.push('catchup'),
     noteCloudReadFailure: failures => calls.push('red:' + failures[0].code),
     document: { hidden: false },
   });
-  const source = ['syncCloudGameChannel', 'onCloudGameChannelStatus', 'leaveCloudGameChannel'].map(fn).join('\n');
-  vm.runInContext(source + '\nvar cloudGameChannel = null, cloudGameChannelId = "", cloudGameChannelBroken = false;', context);
+  const source = ['cloudChannelGameIds', 'syncCloudGameChannel', 'onCloudGameChannelStatus', 'leaveCloudGameChannel'].map(fn).join('\n');
+  vm.runInContext('var CLOUD_GAME_CHANNEL_CAP = 4; var cloudGameChannels = new Map();\n' + source, context);
   context.syncCloudGameChannel();
   assert.equal(created, 1);
-  const first = vm.runInContext('cloudGameChannel', context);
+  const first = made[0];
   first.cb('SUBSCRIBED');
   assert.deepEqual(calls, ['catchup']);
   first.cb('TIMED_OUT');
   assert.equal(calls[1], 'red:TIMED_OUT');
-  context.syncCloudGameChannel(); // same game id, but the channel is broken: recreated
+  context.syncCloudGameChannel(); // same table, but the channel is broken: recreated
   assert.equal(created, 2);
   assert.ok(calls.includes('remove'));
   first.cb('CLOSED'); // a callback from the replaced channel (including its own teardown) is ignored
   assert.equal(calls.filter(c => c.startsWith('red:')).length, 1);
-  vm.runInContext('cloudGameChannel', context).cb('SUBSCRIBED'); // a re-subscribe catches up again
+  made[1].cb('SUBSCRIBED'); // a re-subscribe catches up again
   assert.equal(calls.filter(c => c === 'catchup').length, 2);
 });
 

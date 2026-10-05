@@ -19,7 +19,7 @@ function sourceBetween(startMarker, endMarker) {
   return html.slice(start, end);
 }
 const pureSource = sourceBetween('  // ---------- cloud mapping (pure) ----------', '  function el(');
-const storeSource = sourceBetween('  // ---------- cloud store (Supabase) ----------', '  // ---- realtime: the open table ----');
+const storeSource = sourceBetween('  // ---------- cloud store (Supabase) ----------', '  // ---- realtime: the open tables ----');
 
 function load() {
   const context = vm.createContext({});

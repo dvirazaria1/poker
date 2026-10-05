@@ -1280,7 +1280,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 90</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 91</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -1634,9 +1634,14 @@
     if (source && !source.example && Array.isArray(source.players) && source.players.length) return "active";
     return "closed";
   }
+  // Boot: exactly one open table resumes into it (as before); several open tables -- or one that
+  // is not the current pointer -- land on the Games dashboard, where every table has its card.
   function initialAppView(gameState) {
+    const open = openGameSlots(gameState);
+    if (open.length > 1) return "games";
     if (isGameOpen(gameState) && gameState.phase === "active") return "game";
     if (isGameOpen(gameState) && gameState.phase === "settlement") return "settle";
+    if (open.length === 1) return "games";
     return "profile";
   }
 
@@ -1825,6 +1830,7 @@
       groupId: state.groupId || null,
       startedAt: state.startedAt || null,
       leaderRef: state.leaderRef || null,
+      games: state.games || [],
       groups: state.groups || [],
       groupMembers: state.groupMembers || [],
       invites: state.invites || [],
@@ -1857,14 +1863,16 @@
       groupId: data.groupId || data.clanId || null,
       startedAt: typeof data.startedAt === "string" ? data.startedAt : null,
       leaderRef: data.leaderRef && typeof data.leaderRef === "object" ? data.leaderRef : null,
+      // Round 2: every open table travels; a document from an older build has none and migrates.
+      ...(Array.isArray(data.games) ? { games: data.games } : {}),
       groups: Array.isArray(data.groups) ? data.groups : [],
       groupMembers: Array.isArray(data.groupMembers) ? data.groupMembers : [],
       invites: Array.isArray(data.invites) ? data.invites : [],
       friendships: Array.isArray(data.friendships) ? data.friendships : [],
       updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : "",
     })));
-    if (JSON.stringify({ g: incoming.gameId, q: incoming.phase, e: incoming.example, p: incoming.players, h: incoming.history, d: incoming.debts, s: incoming.settlementStatuses, a: incoming.startedAt, gr: incoming.groups, gm: incoming.groupMembers, iv: incoming.invites, fr: incoming.friendships, gi: incoming.groupId, lr: incoming.leaderRef }) ===
-        JSON.stringify({ g: state.gameId, q: state.phase, e: state.example, p: state.players, h: state.history, d: state.debts, s: state.settlementStatuses, a: state.startedAt, gr: state.groups, gm: state.groupMembers, iv: state.invites, fr: state.friendships, gi: state.groupId, lr: state.leaderRef })) return;
+    if (JSON.stringify({ g: incoming.gameId, q: incoming.phase, e: incoming.example, p: incoming.players, h: incoming.history, d: incoming.debts, s: incoming.settlementStatuses, a: incoming.startedAt, gr: incoming.groups, gm: incoming.groupMembers, iv: incoming.invites, fr: incoming.friendships, gi: incoming.groupId, lr: incoming.leaderRef, gs: incoming.games }) ===
+        JSON.stringify({ g: state.gameId, q: state.phase, e: state.example, p: state.players, h: state.history, d: state.debts, s: state.settlementStatuses, a: state.startedAt, gr: state.groups, gm: state.groupMembers, iv: state.invites, fr: state.friendships, gi: state.groupId, lr: state.leaderRef, gs: state.games })) return;
     // Don't yank the UI out from under an active edit — apply on blur.
     const ae = document.activeElement;
     if (ae && (ae.tagName === "INPUT")) { pendingRemote = incoming; return; }
@@ -1897,22 +1905,15 @@
   function tryApplyParked() {
     const ae = document.activeElement;
     if (ae && ae.tagName === "INPUT") return; // will retry on the next focusout
-    // A realtime table update parks the same way a document snapshot does.
-    if (pendingCloudGame) {
-      if (cloudPushTimer || Date.now() < dirtyUntil) {
+    // A parked realtime update is replayed by reading that table again, never from the old snapshot.
+    if (pendingCloudGameIds.size) {
+      if (cloudPushTimer || cloudPushing || Date.now() < dirtyUntil) {
         setTimeout(tryApplyParked, 600);
         return;
       }
-      const game = pendingCloudGame;
-      pendingCloudGame = null;
-      if (shouldApplyIncomingGame(state, game, false)) {
-        const mergedGame = normalize(mergeCloudIntoState(state, { game }, {}));
-        if (mergedGame) {
-          state = mergedGame;
-          try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
-          render();
-        }
-      }
+      const ids = Array.from(pendingCloudGameIds);
+      pendingCloudGameIds = new Set();
+      ids.forEach(id => { if ((state.games || []).some(g => g.gameId === id)) pullCloudGame(id); });
     }
     if (!pendingRemote) return;
     if (saveTimer || Date.now() < dirtyUntil) {
@@ -2035,14 +2036,17 @@
   let cloudInsertReconcile = null; // { accountId, ids: { collection: string[] }, attempts }
   let cloudProfileIds = [];  // every profile id seen in a pulled row (see CloudCtx)
   let cloudGameCreators = {}; // gameId -> games.created_by, so a second device never rewrites it
-  let cloudGameChannel = null;   // the postgres_changes subscription for the open table
-  let cloudGameChannelId = "";   // which game it is for ("" = none)
-  // The channel reported CHANNEL_ERROR / TIMED_OUT / CLOSED. The same-game-id shortcut in
-  // syncCloudGameChannel would otherwise keep that dead subscription forever; with this set the next
-  // foreground / online / retry / push / pull recreates it. In memory only, like the channel.
-  let cloudGameChannelBroken = false;
-  let cloudGameEventTimer = null;
-  let pendingCloudGame = null;   // a realtime update parked until the active input loses focus
+  // One postgres_changes subscription per open table: gameId -> { channel, broken, timer }. `broken`
+  // (CHANNEL_ERROR / TIMED_OUT / CLOSED) makes the next foreground / online / retry / push / pull
+  // recreate it. In memory only.
+  let cloudGameChannels = new Map();
+  // Tables whose realtime update had to wait (an input focused at that table, or a local write not
+  // pushed yet). Only the ID is parked: replay re-reads the table fresh rather than applying a
+  // snapshot that may have been overtaken by a local edit or a local close meanwhile.
+  let pendingCloudGameIds = new Set();
+  // Tables this device reset or abandoned this session: a pull must not bring them back while the
+  // server's delete is on its way (or was refused because somebody else created the table).
+  let cloudDiscardedGameIds = new Set();
   // Raw guests rows this pull could read (RLS already narrowed them — see
   // docs/backend/link-guest.sql). In-memory session cache only, same pattern as cloudProfileIds/
   // cloudGameCreators: never a new localStorage key, never part of `state`, rebuilt every pull.
@@ -2113,10 +2117,27 @@
     (pushed.gamesClosed || []).forEach(row => ids.add(String(row.id)));
     return ids;
   }
+  // A table reset or abandoned here (M8 in the Round 2 review): hide it from pulls for the rest of
+  // the session and, when it ever reached the server, delete it there (games_delete_creator:
+  // only its creator, only while open -- the children cascade). For anyone else the delete
+  // affects no rows: somebody else's table carries on, and returns here on the next app start.
+  function discardCloudGame(gameId) {
+    if (!supabase) return;
+    const id = String(gameId || "");
+    if (!authUser || !isCloudId(id)) return;
+    cloudDiscardedGameIds.add(id);
+    if (!cloudKnownGameIds().has(id)) return; // never reached the server
+    supabase.from("games").delete().eq("id", id)
+      .then(result => { if (result && result.error) console.warn("cloud: table delete refused", id, result.error.message); })
+      .catch(() => {});
+  }
   function cloudCollections() {
     const games = [];
-    const open = gameSnapshotFromState(state);
-    if (open) games.push(open);
+    // Round 2: every open table goes up, not just the one on screen.
+    (Array.isArray(state.games) ? state.games : []).forEach(slot => {
+      const snap = gameSnapshotFromState({ ...slot, example: !!state.example });
+      if (snap) games.push(snap);
+    });
     const known = cloudKnownGameIds();
     (state.history || []).forEach(entry => {
       if (entry && known.has(String(entry.gameId))) games.push(gameSnapshotFromHistory(entry));
@@ -2750,12 +2771,14 @@
         const kids = cloudChildrenOf(row.id, payload);
         return buildOpenGameFromCloud(row, kids.participants, kids.entries, kids.transfers, gameCtx);
       });
-    const picked = pickCloudOpenGame(state, openCandidates);
-    if (picked.action === "keep" && openCandidates.length) {
-      // The single-slot limitation, out loud: this device is at a different table, so the server's
-      // open game waits until that one is closed.
-      console.warn("cloud: another open game is waiting on the server", openCandidates.map(g => g.gameId));
-    }
+    // Round 2: every table the server holds open joins state.games beside this device's own. A
+    // local table is dropped only when the server closed it, or confirmed it earlier and no longer
+    // has it. Demo data never mixes with real tables. A held games read decides nothing.
+    const closedOnServer = new Set((payload.closedGames || []).map(row => String(row && row.id)));
+    const confirmedOnServer = new Set(((lastPushedRows || EMPTY_CLOUD_ROWS).games || []).map(row => String(row.id)));
+    const mergedGames = gamesHeld || (state.example && !openCandidates.length) ? undefined
+      : mergeOpenGameSlots(state.example ? [] : state.games, openCandidates,
+        { closedOnServer, confirmedOnServer, closedHere, discarded: cloudDiscardedGameIds });
     const transfersByGame = {};
     (payload.transfers || []).forEach(row => {
       if (row && row.id) transfersByGame[String(row.id)] = String(row.settlement_key || "");
@@ -2770,12 +2793,12 @@
       // undefined = "not fetched": mergeCloudIntoState leaves that collection exactly as it is.
       history: gamesHeld ? undefined : history,
       debts: debtsHeld ? undefined : (payload.debts || []).map(row => rowToDebt(row, ctx, transfersByGame)),
-      game: picked.action === "load" ? picked.game : null,
+      games: mergedGames,
       unavailable: Array.from(unavailable),
     };
     let serverBaseline = buildCloudRows({
       ...pulled,
-      games: (picked.action === "load" && picked.game ? [gameSnapshotFromState({ ...picked.game, example: false })] : [])
+      games: openCandidates.map(g => gameSnapshotFromState({ ...g, example: false })).filter(Boolean)
         .concat(history.map(gameSnapshotFromHistory)),
       debts: pulled.debts,
     }, cloudContext());
@@ -2822,7 +2845,9 @@
         return;
       }
     }
-    const merged = normalize(mergeCloudIntoState(state, pulled, { keepLocalIds: cloudKeepLocalIds() }));
+    // Re-mirror BEFORE normalize: the singular fields still describe the table as it was, and
+    // migrateGamesArray would fold a table the server just removed straight back in from them.
+    const merged = normalize(syncCurrentGameMirror(mergeCloudIntoState(state, pulled, { keepLocalIds: cloudKeepLocalIds() })));
     if (merged) state = merged;
     // The baseline is what the SERVER holds, not what we now hold: a record the merge kept is
     // absent from it and goes up on the next push (that is the first-device seeding rule).
@@ -2897,64 +2922,81 @@
     try { supabase.removeChannel(channel); } catch (e) {}
   }
 
-  // ---- realtime: the open table ----
+  // ---- realtime: the open tables ----
   // postgres_changes respects RLS, so a member only ever receives rows they could have SELECTed.
-  // The channel is per game and torn down the moment the slot changes or the game closes.
+  // Round 2: one channel per open table (the current one first, at most CLOUD_GAME_CHANNEL_CAP), each
+  // torn down the moment its table closes or leaves state.games. Tables past the cap still update
+  // through the account channel's games events and every foreground pull.
+  const CLOUD_GAME_CHANNEL_CAP = 4;
+  function cloudChannelGameIds(s) {
+    if (!s || s.example) return [];
+    const ids = openGameSlots(s).map(g => String(g.gameId)).filter(isCloudId);
+    const cur = String(s.gameId || "");
+    const ordered = ids.includes(cur) ? [cur, ...ids.filter(id => id !== cur)] : ids;
+    return ordered.slice(0, CLOUD_GAME_CHANNEL_CAP);
+  }
   function syncCloudGameChannel() {
     if (!supabase || !authUser) return leaveCloudGameChannel();
-    const id = (!state.example && state.phase !== "closed" && isCloudId(state.gameId)) ? String(state.gameId) : "";
-    if (id === cloudGameChannelId && !cloudGameChannelBroken) return;
-    leaveCloudGameChannel();
-    if (!id) return;
-    cloudGameChannelId = id;
-    const onChange = () => scheduleCloudGamePull();
-    try {
-      const channel = supabase.channel("game:" + id)
-        .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: "id=eq." + id }, onChange)
-        .on("postgres_changes", { event: "*", schema: "public", table: "game_participants", filter: "game_id=eq." + id }, onChange)
-        .on("postgres_changes", { event: "*", schema: "public", table: "entries", filter: "game_id=eq." + id }, onChange);
-      cloudGameChannel = channel;
-      channel.subscribe(status => onCloudGameChannelStatus(channel, id, status));
-    } catch (e) {
-      cloudGameChannel = null;
-      cloudGameChannelId = "";
-    }
+    const wanted = new Set(cloudChannelGameIds(state));
+    Array.from(cloudGameChannels.keys()).forEach(id => {
+      const entry = cloudGameChannels.get(id);
+      if (!wanted.has(id) || entry.broken) leaveCloudGameChannel(id);
+    });
+    wanted.forEach(id => {
+      if (cloudGameChannels.has(id)) return;
+      const onChange = () => scheduleCloudGamePull(id);
+      try {
+        const channel = supabase.channel("game:" + id)
+          .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: "id=eq." + id }, onChange)
+          .on("postgres_changes", { event: "*", schema: "public", table: "game_participants", filter: "game_id=eq." + id }, onChange)
+          .on("postgres_changes", { event: "*", schema: "public", table: "entries", filter: "game_id=eq." + id }, onChange);
+        cloudGameChannels.set(id, { channel, broken: false, timer: null });
+        channel.subscribe(status => onCloudGameChannelStatus(channel, id, status));
+      } catch (e) {
+        cloudGameChannels.delete(id);
+      }
+    });
   }
   // The subscription's own verdict. SUBSCRIBED (the first join AND every re-join after a drop) is
-  // when events may have been missed, so it always runs a catch-up read of the game; the three
+  // when events may have been missed, so it always runs a catch-up read of that table; the three
   // failure statuses mark the channel for recreation and say so on the dot. A callback from a
   // channel that has since been replaced (leaveCloudGameChannel's own CLOSED included) is ignored.
   function onCloudGameChannelStatus(channel, gameId, status) {
-    if (cloudGameChannel !== channel || cloudGameChannelId !== gameId) return;
+    const entry = cloudGameChannels.get(gameId);
+    if (!entry || entry.channel !== channel) return;
     if (status === "SUBSCRIBED") {
-      cloudGameChannelBroken = false;
-      scheduleCloudGamePull();
+      entry.broken = false;
+      scheduleCloudGamePull(gameId);
       return;
     }
     if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-      cloudGameChannelBroken = true;
+      entry.broken = true;
       // iOS drops sockets of a backgrounded app as a matter of course; coming back recreates the
       // channel (cloudRetryNow) and catches up. Only a drop the person could actually see is red.
       if (document.hidden) return;
       noteCloudReadFailure([describeCloudError(tagCloudError({ code: String(status), message: "live updates are down" }, "realtime"))]);
     }
   }
-  function leaveCloudGameChannel() {
-    clearTimeout(cloudGameEventTimer);
-    cloudGameEventTimer = null;
-    const channel = cloudGameChannel;
-    cloudGameChannel = null;
-    cloudGameChannelId = "";
-    cloudGameChannelBroken = false;
-    if (!supabase || !channel) return;
-    try { supabase.removeChannel(channel); } catch (e) {}
+  // One table's channel, or (no id) every one of them.
+  function leaveCloudGameChannel(gameId) {
+    const ids = gameId ? [String(gameId)] : Array.from(cloudGameChannels.keys());
+    ids.forEach(id => {
+      const entry = cloudGameChannels.get(id);
+      if (!entry) return;
+      clearTimeout(entry.timer);
+      cloudGameChannels.delete(id);
+      if (!supabase || !entry.channel) return;
+      try { supabase.removeChannel(entry.channel); } catch (e) {}
+    });
   }
   // A buy-in on the other phone fires three events; 300ms of debounce turns them into one read.
-  function scheduleCloudGamePull() {
-    clearTimeout(cloudGameEventTimer);
-    cloudGameEventTimer = setTimeout(() => {
-      cloudGameEventTimer = null;
-      pullCloudGame(cloudGameChannelId);
+  function scheduleCloudGamePull(gameId) {
+    const entry = cloudGameChannels.get(String(gameId));
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    entry.timer = setTimeout(() => {
+      entry.timer = null;
+      pullCloudGame(String(gameId));
     }, 300);
   }
   async function pullCloudGame(gameId) {
@@ -2963,7 +3005,7 @@
     // that asked, the write counter the read is older than, and the table this read is for.
     const accountId = authUser.id;
     const readSeq = cloudWriteSeq;
-    const stale = () => !authUser || authUser.id !== accountId || String(cloudGameChannelId) !== String(gameId);
+    const stale = () => !authUser || authUser.id !== accountId || !cloudGameChannels.has(String(gameId));
     try {
       const gameResult = await supabase.from("games").select("*").eq("id", gameId).maybeSingle();
       if (stale()) return;
@@ -2980,7 +3022,7 @@
       // A failed child read is not an empty table: keep last-good and name the failing table.
       if (children.failures.length) { noteCloudReadFailure(children.failures); return; }
       // A local write landed while the reads were out: this snapshot is older than the device.
-      if (readSeq !== cloudWriteSeq) { scheduleCloudGamePull(); return; }
+      if (readSeq !== cloudWriteSeq) { scheduleCloudGamePull(gameId); return; }
       applyCloudGame(row, children.participants, children.entries, children.transfers, accountId);
     } catch (e) {}
   }
@@ -2992,22 +3034,25 @@
     if (!cloudGameChildrenAreTrustworthy(gameRow, participantRows, authUser.id)) return;
     // Same rule as the full pull: a game already in this device's history stays closed here.
     if ((state.history || []).some(entry => entry && String(entry.gameId) === String(gameRow.id))) return;
+    const id = String(gameRow.id);
+    // Only a table this device still holds (closed or reset here meanwhile = gone for good).
+    if (!(state.games || []).some(g => g.gameId === id)) return;
     const incoming = buildOpenGameFromCloud(gameRow, participantRows, entryRows, transferRows, cloudContext());
     // A local edit that has not been pushed yet outranks the server, exactly like the document
-    // sync always did: park it and try again.
-    if (cloudPushTimer || Date.now() < dirtyUntil) {
-      pendingCloudGame = incoming;
+    // sync always did: park the table and read it again once that write is out.
+    if (cloudPushTimer || cloudPushing || Date.now() < dirtyUntil) {
+      pendingCloudGameIds.add(id);
       setTimeout(tryApplyParked, 600);
       return;
     }
     const active = document.activeElement;
     const hasActiveInput = !!(active && active.tagName === "INPUT");
     if (!shouldApplyIncomingGame(state, incoming, hasActiveInput)) {
-      if (hasActiveInput) pendingCloudGame = incoming; // retried on focusout
+      if (hasActiveInput) pendingCloudGameIds.add(id); // retried on focusout
       return;
     }
-    pendingCloudGame = null;
-    const merged = normalize(mergeCloudIntoState(state, { game: incoming }, {}));
+    pendingCloudGameIds.delete(id);
+    const merged = normalize(syncCurrentGameMirror(mergeCloudIntoState(state, { gameSlot: incoming }, {})));
     if (!merged) return;
     state = merged;
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
@@ -3066,7 +3111,8 @@
     cloudGameCreators = {};
     cloudGuestRows = [];
     cloudGroupAggregates = { available: false, leaderboard: [], gameSummaries: [] };
-    pendingCloudGame = null;
+    pendingCloudGameIds = new Set();
+    cloudDiscardedGameIds = new Set();
     leaveCloudGameChannel();
     leaveCloudAccountChannel();
     setSync(false, "שמירה מקומית");
@@ -3653,7 +3699,8 @@
     const members = Array.isArray(c.groupMembers) ? c.groupMembers : [];
     const active = activeMembers(members, groupId);
     const games = resolveGroupGameSummaries(c, groupId, aggregates);
-    const currentGame = c.currentGame || {};
+    const currentGame = (Array.isArray(c.games) ? c.games : [c.currentGame]).filter(Boolean)
+      .find(g => isGameOpen(g) && g.groupId === groupId) || {};
     const localActive = isGameOpen(currentGame) && currentGame.groupId === groupId;
     const serverOpen = !localActive && aggregates && Array.isArray(aggregates.openGames)
       ? aggregates.openGames.find(g => g && g.groupId === groupId) : null;
@@ -3710,6 +3757,10 @@
   function isEmptyOpenGame(currentGame) {
     const g = currentGame || {};
     return hasOpenPhase(g) && (!Array.isArray(g.players) || g.players.length === 0);
+  }
+  // Every table that is really open (at least one player) -- the dashboard's list.
+  function openGameSlots(state) {
+    return (Array.isArray(state && state.games) ? state.games : []).filter(isGameOpen);
   }
   // ---------- multi-game round 1 (docs/superpowers/plans/2026-09-10-multi-game.md) ----------
   // OpenGameSlot = { gameId, phase: "active"|"settlement", players: Player[], groupId: string|null,
@@ -3824,19 +3875,56 @@
     const candidate = extractSingularSlot(s, gameId, phase);
     return isGameOpen({ ...candidate, example: s.example }) ? [candidate] : [];
   }
-  // The engine has one current-game slot: a group can have at most one open game, and the
-  // whole device can have only one open game at a time (documented limitation, see plan).
-  // An empty open slot (isEmptyOpenGame) does not block — starting a group game simply replaces it.
-  function canStartGroupGame(collections, groupId) {
+  // Round 2 (docs/superpowers/plans/2026-10-05-multi-game-round2.md): a device can hold several
+  // open tables; what stays one-at-a-time is a GROUP (games_one_open_per_group_uk). A group is
+  // blocked by its own open table here, or by one the server already holds that this device has no
+  // seat at (serverOpenGames = cloudGroupAggregates.openGames). An empty slot never blocks.
+  function canStartGroupGame(collections, groupId, serverOpenGames) {
     const c = collections || {};
     const groups = Array.isArray(c.groups) ? c.groups : [];
     const group = groups.find(g => g && g.id === groupId);
     if (group && (group.archivedAt || group.deletedAt)) return { ok: false, reason: "group-archived" };
-    const currentGame = c.currentGame || {};
-    const isOpen = isGameOpen(currentGame);
-    if (isOpen && currentGame.groupId === groupId) return { ok: false, reason: "group-has-open-game" };
-    if (isOpen) return { ok: false, reason: "another-game-open" };
+    const slots = Array.isArray(c.games) ? c.games : (c.currentGame ? [c.currentGame] : []);
+    if (slots.some(g => isGameOpen(g) && g.groupId === groupId)) return { ok: false, reason: "group-has-open-game" };
+    if ((Array.isArray(serverOpenGames) ? serverOpenGames : []).some(g => g && g.groupId === groupId)) {
+      return { ok: false, reason: "group-has-open-game" };
+    }
     return { ok: true, reason: null };
+  }
+  function groupGameSlot(state, groupId) {
+    return openGameSlots(state).find(g => g.groupId === groupId) || null;
+  }
+  // Starting a table never closes another. The one slot it drops is an EMPTY current one (a table
+  // opened and left with nobody seated); every other open table stays exactly as it was.
+  function openNewGameSlot(base, patch) {
+    const current = currentGameSlot(base);
+    const dropCurrent = !!current && isEmptyOpenGame(current);
+    const games = (Array.isArray(base.games) ? base.games : []).filter(g => !(dropCurrent && g.gameId === base.gameId));
+    const gameId = newId();
+    const slot = { gameId, phase: "active", players: [], groupId: null, startedAt: null, leaderRef: null,
+      settlementStatuses: {}, ...patch };
+    return syncCurrentGameMirror({ ...base, example: false, gameId, games: [...games, slot] });
+  }
+  // Moves the current-table pointer (and the mirror every reader uses) to another open table.
+  function selectGameSlot(base, gameId) {
+    const id = String(gameId || "");
+    if (!(Array.isArray(base.games) ? base.games : []).some(g => g.gameId === id)) return base;
+    return syncCurrentGameMirror({ ...base, gameId: id });
+  }
+  // A server snapshot of an OPEN table carries no transfers, so its settlementStatuses come back
+  // null: the paid marks somebody already toggled at this table live only here. Keep that table's
+  // own map unless the server sent one (an explicit {} still wins) -- never another table's.
+  function mergeIncomingSlot(local, incoming) {
+    if (!incoming) return local;
+    if (incoming.settlementStatuses != null || !local) return incoming;
+    return { ...incoming, settlementStatuses: local.settlementStatuses || {} };
+  }
+  // A snapshot of one table (realtime, or a single-game read) replaces only its own slot, and only
+  // a slot this device still holds: a table closed or reset here meanwhile is never re-added.
+  function replaceGameSlot(games, slot) {
+    const list = Array.isArray(games) ? games : [];
+    if (!slot || !slot.gameId) return list;
+    return list.map(g => (g.gameId === slot.gameId ? mergeIncomingSlot(g, slot) : g));
   }
   // Rebuilds the current-game slot for a new/reset game while preserving every other collection on
   // state (fixes a latent data-loss bug in the old hand-built object literals). Mints a fresh
@@ -5051,36 +5139,42 @@
     };
   }
 
-  // THE single-slot rule, in one place. The app holds exactly one current game; the server may
-  // legitimately hold several open ones (one per group). An empty, closed or example slot takes
-  // the server's game, the same game replaces itself, and a DIFFERENT open game on this device
-  // wins -- the local table is the one somebody is standing at. Documented limitation, not a bug:
-  // the second open game becomes reachable only once that local one is closed.
   function cloudGroupOpenGames(rows) {
     return (Array.isArray(rows) ? rows : [])
       .filter(row => row && row.group_id && (row.phase === "active" || row.phase === "settlement"))
       .map(row => ({ groupId: String(row.group_id), gameId: String(row.id || ""), phase: row.phase }));
   }
-  function pickCloudOpenGame(localGame, openGames) {
-    const games = (Array.isArray(openGames) ? openGames : []).filter(Boolean);
-    if (!games.length) return { action: "keep", game: null };
-    const local = localGame || {};
-    const localId = String(local.gameId || "");
-    const localOpen = !!localId && !local.example && local.phase !== "closed";
-    if (!localOpen) return { action: "load", game: games[0] };
-    const same = games.find(g => String(g.gameId || g.id || "") === localId);
-    if (same) return { action: "load", game: same };
-    return { action: "keep", game: null };
+  // The pull's merge of open tables. Every table the server holds open is kept (server wins for a
+  // table both sides know -- the whole pull is parked while a local edit is unsent). A local table
+  // the server does not list stays only while it may simply not have arrived yet: one the server
+  // closed, or one the server confirmed earlier and no longer has (deleted/abandoned), is dropped.
+  function mergeOpenGameSlots(localSlots, serverSlots, ctx) {
+    const c = ctx || {};
+    const has = (set, id) => !!set && set.has(String(id));
+    const localById = new Map((Array.isArray(localSlots) ? localSlots : []).filter(Boolean).map(g => [String(g.gameId), g]));
+    const server = (Array.isArray(serverSlots) ? serverSlots : [])
+      .filter(g => g && !has(c.closedHere, g.gameId) && !has(c.discarded, g.gameId));
+    const serverIds = new Set(server.map(g => String(g.gameId)));
+    const merged = server.map(g => mergeIncomingSlot(localById.get(String(g.gameId)), g));
+    (Array.isArray(localSlots) ? localSlots : []).forEach(g => {
+      if (!g) return;
+      const id = String(g.gameId);
+      if (serverIds.has(id) || has(c.closedHere, id) || has(c.closedOnServer, id) || has(c.confirmedOnServer, id)) return;
+      merged.push(g);
+    });
+    return merged;
   }
+
   // The realtime apply guard: never overwrite a table somebody is typing into, and never let one
   // game's events replace a different game's slot.
+  // Round 2: an update replaces only its own table, so another table being current is no reason
+  // to refuse it. What still waits is an update to the table someone is typing into right now.
   function shouldApplyIncomingGame(localState, incoming, hasActiveInput) {
     if (!incoming) return false;
-    if (hasActiveInput) return false;
     const local = localState || {};
-    const localId = String(local.gameId || "");
-    if (!localId || local.example || local.phase === "closed") return true;
-    return localId === String(incoming.gameId || incoming.id || "");
+    if (local.example) return false;
+    const isCurrent = String(local.gameId || "") === String(incoming.gameId || incoming.id || "");
+    return !(hasActiveInput && isCurrent);
   }
 
 
@@ -5510,18 +5604,11 @@
       ...(Array.isArray(p.history) ? { history: mergeCloudHistory(s.history, p.history) } : {}),
       // A debt is server-owned by id too, so a "paid" flipped on another device lands here.
       ...(Array.isArray(p.debts) ? { debts: mergeCloudDebts(s.debts, p.debts) } : {}),
-      // The current-game slot: only ever replaced by pickCloudOpenGame's decision.
-      ...(p.game ? {
-        example: false,
-        gameId: p.game.gameId,
-        phase: p.game.phase,
-        groupId: p.game.groupId || null,
-        startedAt: p.game.startedAt || null,
-        leaderRef: p.game.leaderRef || null,
-        players: p.game.players || [],
-        settlementStatuses: p.game.settlementStatuses
-          || (s.settlementStatuses && typeof s.settlementStatuses === "object" ? s.settlementStatuses : {}),
-      } : {}),
+      // Round 2: open tables live in state.games. A full pull hands over the merged list
+      // (mergeOpenGameSlots); a realtime read hands over one table, which replaces only its own slot.
+      // The singular fields are never written here -- syncCurrentGameMirror derives them.
+      ...(Array.isArray(p.games) ? { example: false, games: p.games } : {}),
+      ...(p.gameSlot ? { example: false, games: replaceGameSlot(s.games, p.gameSlot) } : {}),
     };
   }
   function mergeCloudHistory(localHistory, pulledHistory) {
@@ -5909,6 +5996,7 @@
     // Strict guard: only a real (non-example) open phase with zero players is ever discarded.
     const leavingTable = (appView === "game" || appView === "settle") && nextView !== "game" && nextView !== "settle";
     if (leavingTable && isEmptyOpenGame(state)) {
+      discardCloudGame(state.gameId); // an emptied table must not linger open on the server
       state = newCurrentGame(state, { phase: "closed" });
       expandedEntries.clear();
       save();
@@ -5969,11 +6057,10 @@
     setTimeout(() => container.classList.remove("load-in"), 600);
   }
 
-  // Refused while a real game (with players) is open — newCurrentGame would silently replace it.
-  // The dashboard renders the quick action disabled in that state; this guard is the backstop.
+  // Round 2: another open table never blocks this -- openNewGameSlot keeps it and points here.
   function startUngroupedGame() {
-    if (isGameOpen(state)) return;
-    state = newCurrentGame(state, { phase: "active", startedAt: new Date().toISOString(), groupId: null });
+    resetTableUi();
+    state = openNewGameSlot(state, { phase: "active", startedAt: new Date().toISOString(), groupId: null });
     expandedEntries.clear();
     openMenu = null; customOpen = null; pendingAmount = null; exitOpen = null; exitJustOpened = null;
     save();
@@ -5985,9 +6072,10 @@
   // createPlayer helper plus an immediate first buy-in (same product rule as addPlayer).
   function startGroupGame(groupId, participants) {
     const list = dedupeParticipants(participants);
-    if (!canStartGroupGame(collectionsOf(state), groupId).ok || list.length < 1) return false;
+    if (!canStartGroupGame(collectionsOf(state), groupId, cloudGroupAggregates.openGames).ok || list.length < 1) return false;
     if (!findMyMembership(state.groupMembers, groupId, me)) return false;
-    state = newCurrentGame(state, {
+    resetTableUi();
+    state = openNewGameSlot(state, {
       phase: "active",
       groupId,
       startedAt: new Date().toISOString(),
@@ -6016,6 +6104,24 @@
     if (!isGameOpen(state)) return;
     closeGroupPreview();
     setAppView(state.phase === "settlement" ? "settle" : "game");
+  }
+  // Per-table UI (menus, drafts, holds) belongs to the table it was opened on: cleared whenever the
+  // current table changes, so nothing typed or armed at one table can act on another.
+  function resetTableUi() {
+    expandedEntries.clear();
+    openMenu = null; customOpen = null; pendingAmount = null; exitOpen = null; exitJustOpened = null;
+    clearCloseHold();
+    clearFinishGameHold();
+  }
+  function enterActiveGame(gameId) {
+    const id = String(gameId || "");
+    if (!(state.games || []).some(g => g.gameId === id)) return;
+    if (String(state.gameId || "") !== id) {
+      resetTableUi();
+      state = selectGameSlot(state, id);
+      save();
+    }
+    continueCurrentGame();
   }
 
   function openGroup(groupId) {
@@ -6196,6 +6302,7 @@
   // adapters take as input, from the single persisted state document.
   function collectionsOf(state) {
     return {
+      games: state.games,
       groups: state.groups,
       groupMembers: state.groupMembers,
       history: state.history,
@@ -6213,8 +6320,15 @@
   // groups is optional (existing single-argument callers/tests keep working): when omitted, or
   // when gameState.groupId doesn't match a group in it, title falls back to "משחק ללא קבוצה". A
   // match resolves the group's name even when the group is archived.
+  // One summary per open table (Round 2), the current table first. A bare game object without a
+  // `games` array (older callers, tests) is still summarised as the single table it describes.
   function getActiveGameSummaries(gameState, groups) {
-    if (!isGameOpen(gameState)) return []; // an empty table is not a game (see isGameOpen)
+    const g = gameState || {};
+    const slots = Array.isArray(g.games) ? openGameSlots(g) : (isGameOpen(g) ? [g] : []);
+    const ordered = slots.slice().sort((a, b) => (b.gameId === g.gameId) - (a.gameId === g.gameId));
+    return ordered.map(slot => activeGameSummary(slot, groups, slot.gameId === g.gameId ? g.updatedAt : null));
+  }
+  function activeGameSummary(gameState, groups, updatedAt) {
     const validTime = value => typeof value === "string" && !Number.isNaN(Date.parse(value)) ? value : null;
     const players = (Array.isArray(gameState.players) ? gameState.players : []).map(player => {
       const buyins = Array.isArray(player.buyins) ? player.buyins : [];
@@ -6227,7 +6341,7 @@
     });
     const groupList = Array.isArray(groups) ? groups : [];
     const matchedGroup = gameState.groupId ? groupList.find(g => g && g.id === gameState.groupId) : null;
-    return [{
+    return {
       gameId: String(gameState.gameId || ""),
       title: matchedGroup ? matchedGroup.name : "משחק ללא קבוצה",
       phase: gameState.phase,
@@ -6237,8 +6351,8 @@
       potSize: players.reduce((total, player) => total + player.buyinTotal, 0),
       totalEntries: players.reduce((total, player) => total + player.entryCount, 0),
       startedAt: validTime(gameState.startedAt),
-      updatedAt: validTime(gameState.updatedAt),
-    }];
+      updatedAt: validTime(updatedAt === undefined ? gameState.updatedAt : updatedAt),
+    };
   }
 
   function formatGameTime(timestamp) {
@@ -6292,18 +6406,11 @@
 
     const start = el("button", "games-quick-action", "משחק ללא קבוצה");
     start.type = "button";
-    // Data-loss guard: while a game with players is open the slot is taken — the active card's
-    // "כנס לשולחן"/"המשך סגירה" is the way in. Same disabled + quiet reason pattern as the group
-    // page's "התחל משחק" (renderGroupPrimaryAction), same wording.
-    const gameOpen = isGameOpen(state);
-    if (gameOpen) {
-      start.disabled = true;
-      start.setAttribute("aria-disabled", "true");
-    } else start.addEventListener("click", startUngroupedGame);
+    // Round 2: an open table elsewhere never blocks a new one; each has its own card above.
+    start.addEventListener("click", startUngroupedGame);
 
     actions.appendChild(start);
     section.appendChild(actions);
-    if (gameOpen) section.appendChild(el("p", "games-primary-reason", "יש משחק פעיל אחר — סגור אותו קודם"));
     parent.appendChild(section);
   }
 
@@ -6609,10 +6716,6 @@
     setTimeout(finish, 250);
   }
 
-  function enterActiveGame(gameId) {
-    if (String(state.gameId || "") !== String(gameId || "")) return;
-    continueCurrentGame();
-  }
 
   function renderGamesDashboard() {
     // A deferred call (a panel's collapse setTimeout) can still fire after the user has
@@ -6815,8 +6918,15 @@
     btn.type = "button";
     let reason = null;
     const canStart = !summary.hasActiveGame && summary.isMember && gate && gate.ok;
+    const groupSlot = groupGameSlot(state, summary.groupId);
+    if (summary.hasActiveGame && !groupSlot) {
+      // The server holds this group's open table but this device has no seat at it (D4).
+      wrap.appendChild(el("p", "games-primary-status", summary.activeGamePhase === "settlement" ? "בסגירה" : "משחק פעיל בקבוצה"));
+      wrap.appendChild(el("p", "games-primary-reason", "אתה לא בשולחן הזה"));
+      return wrap;
+    }
     if (summary.hasActiveGame) {
-      const activeSummary = getActiveGameSummaries(state, state.groups)[0];
+      const activeSummary = getActiveGameSummaries(state, state.groups).find(s => s.gameId === groupSlot.gameId);
       if (activeSummary) {
         const phaseLabel = summary.activeGamePhase === "settlement" ? "בסגירה" : "משחק פעיל";
         const statusParts = [phaseLabel, formatPlayerCount(activeSummary.playerCount)];
@@ -6825,7 +6935,7 @@
         wrap.appendChild(el("p", "games-primary-reason", formatPlayerNames(activeSummary.playerNames)));
       }
       btn.textContent = summary.activeGamePhase === "settlement" ? "המשך סגירה" : "כנס לשולחן";
-      btn.addEventListener("click", continueCurrentGame);
+      btn.addEventListener("click", () => { closeGroupPreview(); enterActiveGame(groupSlot.gameId); });
     } else if (canStart) {
       btn.textContent = "התחל משחק";
       btn.setAttribute("aria-expanded", String(startGameOpen));
@@ -7807,6 +7917,9 @@
   }
 
   function render() {
+    // The table on screen can vanish (closed on another phone, removed by a pull): never render a
+    // game/settle view with no current table behind it.
+    if ((appView === "game" || appView === "settle") && !currentGameSlot(state)) appView = "games";
     const anim = animNext; animNext = null;
     const inGames = appView === "games" || appView === "game" || appView === "settle" || appView === "group";
     document.body.classList.toggle("games-view", appView === "games");
@@ -9558,6 +9671,7 @@
     resetArmed = null;
     btn.classList.remove("danger-armed");
     label.textContent = "איפוס";
+    discardCloudGame(state.gameId); // reset ends this table on the server too, not just here
     state = newCurrentGame(state, { phase: "closed" });
     expandedEntries.clear();
     openMenu = null; customOpen = null;
@@ -10469,6 +10583,9 @@
   }
 
   // ---------- boot ----------
+  // A pointer left on no table (a close elsewhere, the last open table being a different one) with
+  // exactly one table still open: point at it, so boot resumes into it as it always did.
+  if (!currentGameSlot(state) && openGameSlots(state).length === 1) state = selectGameSlot(state, openGameSlots(state)[0].gameId);
   appView = initialAppView(state);
   render();
   initIosInstallHint();

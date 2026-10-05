@@ -97,42 +97,34 @@ test('getGroupSummary does not report an empty open slot as the group\'s active 
   assert.equal(runJSON(`getGroupSummary(${JSON.stringify(seated)}, 'g1', 'דביר').hasActiveGame`, context), true);
 });
 
-// ---------- quick action: disabled while a game with players is open ----------
+// ---------- quick action: Round 2, another open table never blocks a new one ----------
 
-test('renderQuickActions disables "משחק ללא קבוצה" while a game with players is open, with the shared reason line', () => {
+test('renderQuickActions always offers "משחק ללא קבוצה" (several tables may be open at once)', () => {
   const source = sourceBetween('  function renderQuickActions(parent) {', '  function renderCreateGroupPanel(');
-  assert.match(source, /const gameOpen = isGameOpen\(state\);/);
-  assert.match(source, /start\.disabled = true;/);
-  assert.match(source, /start\.setAttribute\("aria-disabled", "true"\);/);
-  // the click handler is wired only when the slot is free
-  assert.match(source, /\} else start\.addEventListener\("click", startUngroupedGame\);/);
-  // the same wording the group page's start gate already uses for another-game-open
-  assert.match(source, /"games-primary-reason", "יש משחק פעיל אחר — סגור אותו קודם"/);
+  assert.match(source, /start\.addEventListener\("click", startUngroupedGame\);/);
+  assert.doesNotMatch(source, /start\.disabled = true;/);
   const gate = sourceBetween('  function renderGroupPrimaryAction(summary, gate) {', '  function renderHideGroupAction(');
   assert.match(gate, /"another-game-open": "יש משחק פעיל אחר — סגור אותו קודם"/);
-  // disabled capsule styling mirrors .btn-primary:disabled (faint text, no pointer)
-  assert.match(html, /\.games-quick-action:disabled \{ opacity: \.45; cursor: default; color: var\(--faint\); \}/);
 });
 
-test('startUngroupedGame refuses to replace an open game with players (backstop behind the disabled capsule)', () => {
+test('startUngroupedGame opens a new table beside an open one, and replaces only an empty current slot', () => {
   const source = sourceBetween('  function startUngroupedGame() {', '  // Starts a game linked to a group');
+  let n = 0;
   const context = vm.createContext({
-    newId: () => 'new-id', saved: 0, view: null,
+    newId: () => 'new-' + (++n), saved: 0, view: null,
     expandedEntries: new Set(), openMenu: null, customOpen: null, pendingAmount: null, exitOpen: null, exitJustOpened: null,
-    state: { example: false, phase: 'active', gameId: 'real', players: onePlayer, history: [], groups: [{ id: 'g1' }] },
+    state: { example: false, gameId: 'real', history: [], groups: [{ id: 'g1' }],
+      games: [{ gameId: 'real', phase: 'active', players: onePlayer, groupId: null, settlementStatuses: {} }] },
   });
-  vm.runInContext('function save() { saved += 1; } function setAppView(next) { view = next; }' + pureSource + source, context);
+  vm.runInContext('function save() { saved += 1; } function setAppView(next) { view = next; } function resetTableUi() {}' + pureSource + source, context);
   vm.runInContext('startUngroupedGame()', context);
-  assert.equal(vm.runInContext('state.gameId', context), 'real');
-  assert.equal(vm.runInContext('state.players.length', context), 1);
-  assert.equal(vm.runInContext('saved', context), 0);
-  assert.equal(vm.runInContext('view', context), null);
-  // an empty open slot, or a closed slot, is replaced as before
-  vm.runInContext('state = { example: false, phase: "active", gameId: "empty", players: [], history: [], groups: [{ id: "g1" }] }; startUngroupedGame()', context);
-  assert.equal(vm.runInContext('state.gameId', context), 'new-id');
-  assert.equal(vm.runInContext('state.phase', context), 'active');
-  assert.equal(vm.runInContext('state.groups.length', context), 1, 'groups survive newCurrentGame');
+  assert.equal(vm.runInContext('state.gameId', context), 'new-1');
+  assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(state.games.map(g => g.gameId))', context)), ['real', 'new-1']);
   assert.equal(vm.runInContext('view', context), 'game');
+  // the new table is empty: starting another one replaces it instead of piling up empties
+  vm.runInContext('startUngroupedGame()', context);
+  assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(state.games.map(g => g.gameId))', context)), ['real', 'new-2']);
+  assert.equal(vm.runInContext('state.groups.length', context), 1, 'groups survive');
 });
 
 test('continueCurrentGame only enters a game that is actually open (players seated)', () => {
@@ -157,7 +149,7 @@ function loadSetAppView(state) {
     document: { getElementById: () => null },
     clearTimeout: () => {}, matchMedia: () => ({ matches: true }),
     clearCloseHold() {}, setCloseButtonLabel() {}, resetStartGamePanel() {}, resetCreateGroupPanel() {},
-    disarmRemoveMember() {}, flashViewEnter() {},
+    disarmRemoveMember() {}, flashViewEnter() {}, discardCloudGame() {},
   });
   vm.runInContext('function save() { saved += 1; } function render() { rendered += 1; }' + pureSource + source, context);
   return context;

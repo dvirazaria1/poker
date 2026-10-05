@@ -57,10 +57,10 @@ test('createPlayer defaults guestId/memberId to null (ungrouped game) when omitt
 
 // ---------- UI wiring (regex over the full source) ----------
 
-test('startGroupGame is wired to canStartGroupGame, newCurrentGame, createPlayer, addEntry and save', () => {
+test('startGroupGame is wired to canStartGroupGame, openNewGameSlot, createPlayer, addEntry and save', () => {
   const section = sourceBetween('function startGroupGame(', '  function continueCurrentGame(');
-  assert.match(section, /canStartGroupGame\(collectionsOf\(state\), groupId\)\.ok/);
-  assert.match(section, /newCurrentGame\(state, \{/);
+  assert.match(section, /canStartGroupGame\(collectionsOf\(state\), groupId, cloudGroupAggregates\.openGames\)\.ok/);
+  assert.match(section, /openNewGameSlot\(state, \{/);
   assert.match(section, /createPlayer\(participant\)/);
   assert.match(section, /addEntry\(player, MIN_BUYIN\)/);
   assert.match(section, /save\(\)/);
