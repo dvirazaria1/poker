@@ -25,7 +25,7 @@ function runJSON(code, context) {
 // The adapter delegates "is there an open game" to isGameOpen (pure section): an empty table is
 // not a game, so every game state below seats one player and the predicate slice is loaded too.
 const activeGameSource =
-  sourceBetween('  function hasOpenPhase(currentGame) {', '  // The engine has one current-game slot') +
+  sourceBetween('  function hasOpenPhase(currentGame) {', '  // Round 2 (docs/superpowers/plans/2026-10-05-multi-game-round2.md): a device can hold several') +
   sourceBetween('  function getActiveGameSummaries', '  function formatGameTime');
 const onePlayer = [{ id: 'p1', name: 'דביר', buyins: [50] }];
 
@@ -68,7 +68,7 @@ test('getActiveGameSummaries falls back to "משחק ללא קבוצה" without 
 
 const pureSource = sourceBetween('  // ---------- groups domain (pure) ----------', '  function el(');
 
-test('canStartGroupGame reports another-game-open when an ungrouped game is open, and group-has-open-game for its own group', () => {
+test('canStartGroupGame lets a group start beside an open ungrouped game (Round 2), and reports group-has-open-game for its own group', () => {
   const context = vm.createContext({ newId: () => 'stub-id' });
   vm.runInContext(pureSource, context);
   const groups = [{ id: 'g1', archivedAt: null, deletedAt: null }];
@@ -76,7 +76,7 @@ test('canStartGroupGame reports another-game-open when an ungrouped game is open
   const ungroupedActiveGame = { groups, currentGame: { example: false, phase: 'active', groupId: null, players: onePlayer } };
   assert.deepEqual(
     runJSON(`canStartGroupGame(${JSON.stringify(ungroupedActiveGame)}, 'g1')`, context),
-    { ok: false, reason: 'another-game-open' }
+    { ok: true, reason: null }
   );
 
   const ownGroupSettlement = { groups, currentGame: { example: false, phase: 'settlement', groupId: 'g1', players: onePlayer } };

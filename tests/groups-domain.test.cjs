@@ -259,7 +259,7 @@ test('buildLeaderboard gives tied net the same rank number, skipping ranks like 
 
 // ---------- canStartGroupGame ----------
 
-test('canStartGroupGame reports ok, group-archived, group-has-open-game, and another-game-open', () => {
+test('canStartGroupGame reports ok, group-archived and group-has-open-game; another group\'s table no longer blocks (Round 2)', () => {
   const context = load();
   const groups = [{ id: 'g1', archivedAt: null, deletedAt: null }, { id: 'g2', archivedAt: '2026-01-01T00:00:00Z', deletedAt: null }];
 
@@ -273,7 +273,7 @@ test('canStartGroupGame reports ok, group-archived, group-has-open-game, and ano
   assert.deepEqual(runJSON(`canStartGroupGame(${JSON.stringify(sameGroupOpen)}, 'g1')`, context), { ok: false, reason: 'group-has-open-game' });
 
   const otherGroupOpen = { groups, currentGame: { example: false, phase: 'settlement', groupId: 'g1', players: [{ id: 'p1' }] } };
-  assert.deepEqual(runJSON(`canStartGroupGame(${JSON.stringify(otherGroupOpen)}, 'other-group')`, context), { ok: false, reason: 'another-game-open' });
+  assert.deepEqual(runJSON(`canStartGroupGame(${JSON.stringify(otherGroupOpen)}, 'other-group')`, context), { ok: true, reason: null });
 });
 
 // ---------- getGroupSummary(ies) ----------

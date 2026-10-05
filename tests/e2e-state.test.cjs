@@ -390,7 +390,7 @@ test('Scenario B: an ungrouped game (groupId null) settles the same way and neve
 
 test('Scenario C/D: initialAppView routes open games to their phase and otherwise opens profile', () => {
   const source = sourceBetween('  function normalizePhase', '  function normalizeDebt');
-  const openGameSource = sourceBetween('  function hasOpenPhase(currentGame) {', '  // The engine has one current-game slot');
+  const openGameSource = sourceBetween('  function hasOpenPhase(currentGame) {', '  // Round 2 (docs/superpowers/plans/2026-10-05-multi-game-round2.md): a device can hold several');
   const context = vm.createContext({});
   vm.runInContext(openGameSource + source, context);
   assert.equal(vm.runInContext(`initialAppView({ phase: 'active', example: false, players: [{}] })`, context), 'game');

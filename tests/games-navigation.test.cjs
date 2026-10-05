@@ -13,7 +13,7 @@ function sourceBetween(startMarker, endMarker) {
   return html.slice(start, end);
 }
 
-const openGameSource = sourceBetween('  function hasOpenPhase(currentGame) {', '  // The engine has one current-game slot');
+const openGameSource = sourceBetween('  function hasOpenPhase(currentGame) {', '  // Round 2 (docs/superpowers/plans/2026-10-05-multi-game-round2.md): a device can hold several');
 
 test('legacy and explicit game phases normalize to active, settlement, or closed', () => {
   const source = sourceBetween('  function normalizePhase', '  function normalizeDebt');

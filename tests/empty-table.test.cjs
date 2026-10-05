@@ -82,9 +82,9 @@ test('canStartGroupGame is ok when the only open game is empty (ungrouped or the
   assert.deepEqual(runJSON(`canStartGroupGame(${JSON.stringify(emptyUngrouped)}, 'g1')`, context), { ok: true, reason: null });
   const emptySameGroup = { groups, currentGame: { example: false, phase: 'active', groupId: 'g1', players: [] } };
   assert.deepEqual(runJSON(`canStartGroupGame(${JSON.stringify(emptySameGroup)}, 'g1')`, context), { ok: true, reason: null });
-  // a one-player table still blocks — it already holds buy-in money
+  // Round 2: an open ungrouped table no longer blocks a group -- several tables may be open at once
   const oneUngrouped = { groups, currentGame: { example: false, phase: 'active', groupId: null, players: onePlayer } };
-  assert.deepEqual(runJSON(`canStartGroupGame(${JSON.stringify(oneUngrouped)}, 'g1')`, context), { ok: false, reason: 'another-game-open' });
+  assert.deepEqual(runJSON(`canStartGroupGame(${JSON.stringify(oneUngrouped)}, 'g1')`, context), { ok: true, reason: null });
 });
 
 test('getGroupSummary does not report an empty open slot as the group\'s active game', () => {

@@ -213,7 +213,7 @@ test('adding a player records the first entry but leaves every rebuy menu closed
   // Only the slot machinery (currentGameSlot/hasOpenPhase/isGameOpen) is needed here, not the
   // whole groups-domain pure section -- that also defines the REAL createPlayer (which calls
   // newId(), not stubbed in this minimal context) and would shadow the simplified stub below.
-  const slotSource = html.slice(html.indexOf('  function hasOpenPhase(currentGame) {'), html.indexOf('  // The engine has one current-game slot'));
+  const slotSource = html.slice(html.indexOf('  function hasOpenPhase(currentGame) {'), html.indexOf('  // Round 2 (docs/superpowers/plans/2026-10-05-multi-game-round2.md): a device can hold several'));
   vm.runInContext(`
     function createPlayer({name, guestId, memberId}) { return {name, guestId, memberId, buyins: [], entryLog: []}; }
     function addEntry(player, amount) { player.buyins.push(amount); player.entryLog.push({amount}); }
