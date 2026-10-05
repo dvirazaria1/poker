@@ -1,4 +1,4 @@
--- friend-invite-search-path.sql -- every new personal friend link failed (NOT YET APPLIED)
+-- friend-invite-search-path.sql -- every new personal friend link failed (APPLIED 2026-10-05)
 --
 -- app_create_friend_invite() mints its token with gen_random_bytes(), which on Supabase lives in
 -- the `extensions` schema (pgcrypto). The function pins `SET search_path = public`, so the call

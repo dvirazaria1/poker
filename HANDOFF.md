@@ -527,6 +527,9 @@ On 2026-10-05 `invite-helper-grant.sql` was applied: link-guest's trailing REVOK
 EXECUTE on `app_guest_bindable_to_invite` from `authenticated`, and `invites_insert_admin` calls it, so
 every invite insert failed 42501 from 2026-09-10 (dead links/QRs, red sync dot). A helper a policy
 calls must stay executable by the role the policy applies to; revoke only `public`/`anon`.
+Also on 2026-10-05: `fresh-start-2026-10-05.sql` (owner ran it: every table but `profiles` emptied, paired
+with DATA_EPOCH 1 in the client) and `friend-invite-search-path.sql` (pgcrypto lives in `extensions`
+on Supabase; a SECURITY DEFINER function pinned to `search_path = public` cannot see it).
 Each was verified live afterwards with an anonymous `curl` (every SECURITY DEFINER function and view must
 answer `401 permission denied`, never 200/404), and `node tools/rls-probe.mjs` reports 0 findings.
 Google OAuth consent screen is **In production**. Version 65 ships `state.games` as the authoritative
