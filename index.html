@@ -1271,7 +1271,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 78</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 79</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -1483,6 +1483,7 @@
   const BUYIN_OPTIONS = [50, 100, 150];
   // localStorage keys keep the historical "poker-settle" prefix for data continuity
   const KEY = "poker-settle-v1";
+  const DATA_EPOCH = 1; // see freshStart()
   const ME_KEY = "poker-settle-me";
   const THEME_KEY = "poker-settle-theme";
   const CONTACT_KEY = "poker-settle-contact";
@@ -1716,6 +1717,7 @@
       // same normalize()/save() path, never a second localStorage key.
       cloudPendingIds: Array.isArray(s.cloudPendingIds)
         ? s.cloudPendingIds.filter(v => v !== null && v !== undefined && v !== "").map(String) : [],
+      dataEpoch: Number(s.dataEpoch) || 0,
       updatedAt: typeof s.updatedAt === "string" ? s.updatedAt : "",
     };
     // migrateGamesArray builds the durable array off the raw document (either re-validating a
@@ -1737,15 +1739,30 @@
     player.buyins.push(amount);
     player.entryLog.push(entry);
   }
+  // A deliberate fresh start. On 2026-10-05 the owner had the server emptied of everything but
+  // the accounts; a device still holding the old games, groups and debts would push them straight
+  // back up as "unsynced". Any stored document from before the current epoch is therefore
+  // replaced by an empty one on load -- once per device, keeping only UI preferences. Bump
+  // DATA_EPOCH (declared beside KEY, since load() runs before this point) only together with
+  // another server wipe.
+  function freshStart(previous) {
+    const s = normalize({ players: [], dataEpoch: DATA_EPOCH,
+      iosInstallHintDismissed: !!(previous && previous.iosInstallHintDismissed) });
+    s.dataEpoch = DATA_EPOCH;
+    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
+    return s;
+  }
   function load() {
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) {
         const s = normalize(JSON.parse(raw));
-        if (s) return s;
+        if (s) return s.dataEpoch >= DATA_EPOCH ? s : freshStart(s);
       }
     } catch (e) {}
-    return normalize(JSON.parse(JSON.stringify(EXAMPLE)));
+    const example = normalize(JSON.parse(JSON.stringify(EXAMPLE)));
+    example.dataEpoch = DATA_EPOCH;
+    return example;
   }
   function save() {
     pendingRemote = null; // a local edit supersedes any remote state parked for later
