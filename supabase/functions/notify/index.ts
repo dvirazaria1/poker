@@ -79,8 +79,10 @@ Deno.serve(async (req) => {
     const { data: events, error } = await supabase.rpc("app_claim_notification_events", { p_limit: 50 });
     if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
     if (!events || !events.length) break;
+    let retryLater = false;
     for (const event of events as NotificationEvent[]) {
       const result = await deliver(event);
+      if (result.status === "pending") retryLater = true;
       await supabase.from("notification_events").update({
         status: result.status,
         last_error: result.error,
@@ -88,6 +90,8 @@ Deno.serve(async (req) => {
       }).eq("id", event.id);
       total++;
     }
+    // A retryable failure waits for the next wake instead of burning its attempts in this run.
+    if (retryLater) break;
   }
   return Response.json({ ok: true, processed: total });
 });
