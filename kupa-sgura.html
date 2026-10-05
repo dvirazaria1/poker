@@ -1263,7 +1263,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 88</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 89</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -2130,8 +2130,15 @@
   // Marks every group-collection record as pending, directly on state -- the durable outbox, not a
   // second in-memory copy. Called on each local write, before the push: over-marking only ever
   // costs a row that a pull leaves alone for one round trip.
+  // Only rows this device would actually write are pending. An accepted friendship I requested,
+  // for one, is the addressee's row to answer (buildCloudRows leaves it out): marking it pending
+  // meant no push could ever confirm it, and the dot sat on grey "waiting" for good.
   function markCloudPending() {
-    state.cloudPendingIds = Array.from(markPendingIds(state.cloudPendingIds, cloudCollections()));
+    const rows = buildCloudRows(cloudCollections(), cloudContext());
+    const writable = markPendingIds([], rows);
+    // ...and an id stuck from before this rule is released here rather than waiting for a pull.
+    const kept = (state.cloudPendingIds || []).map(String).filter(id => writable.has(id));
+    state.cloudPendingIds = Array.from(markPendingIds(kept, rows));
   }
   // A push confirmed these rows: they are on the server, so they no longer need protecting.
   function clearCloudPending(confirmedRows) {
@@ -2182,7 +2189,7 @@
     lines.push("vp " + window.innerHeight + "/" + (vv ? Math.round(vv.height) + "+" + Math.round(vv.offsetTop) : "-") +
       "/" + document.documentElement.clientHeight + " doc " + document.documentElement.scrollHeight +
       " y " + Math.round(window.scrollY) + " bar " + (r ? Math.round(r.top) + "-" + Math.round(r.bottom) : "-") +
-      (standalone ? " pwa" : " web"));
+      (standalone ? " pwa" : " web") + " " + (((document.body.innerHTML.match(/גרסה \d+/) || [""])[0]).replace("גרסה ", "v")));
     box.textContent = lines.filter(Boolean).join("\n");
     box.hidden = false;
     requestAnimationFrame(() => box.classList.add("show"));
@@ -5501,12 +5508,15 @@
   // or when the server does not hold it at all; dropped when both sides agree exactly.
   function cloudStillPendingIds(pending, serverRows, localRows) {
     const settled = new Set();
+    // Not a row this device writes at all (see markCloudPending): nothing could ever confirm it.
+    const writable = new Set();
+    CLOUD_MERGED_KEYS.forEach(key => ((localRows || {})[key] || []).forEach(row => { if (row && row.id) writable.add(String(row.id)); }));
     CLOUD_MERGED_KEYS.forEach(key => {
       const server = Array.isArray((serverRows || {})[key]) ? serverRows[key] : [];
       const dirty = new Set(diffCollections(server, (localRows || {})[key] || [], "id").upserts.map(row => String(row.id)));
       server.forEach(row => { if (row && row.id && !dirty.has(String(row.id))) settled.add(String(row.id)); });
     });
-    return (pending || []).map(String).filter(id => !settled.has(id));
+    return (pending || []).map(String).filter(id => writable.has(id) && !settled.has(id));
   }
   function keepLocalIdsFor(pending, unconfirmedIds) {
     const ids = new Set((Array.isArray(unconfirmedIds) ? unconfirmedIds : []).map(String));

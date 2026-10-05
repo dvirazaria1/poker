@@ -41,4 +41,11 @@ test("a pull settles pending ids the server already holds identically, and keeps
   const server = { friendships: [{ id: "f1", status: "accepted" }, { id: "f2", status: "pending" }] };
   const local = { friendships: [{ id: "f1", status: "accepted" }, { id: "f2", status: "accepted" }, { id: "f3", status: "pending" }] };
   assert.deepEqual(Array.from(ctx.cloudStillPendingIds(["f1", "f2", "f3"], server, local)), ["f2", "f3"]);
+  // f4 is held locally but is not a row this device writes (absent from the built rows): dropped.
+  assert.deepEqual(Array.from(ctx.cloudStillPendingIds(["f2", "f4"], server, local)), ["f2"]);
+});
+
+test("only rows this device would write are ever marked pending", () => {
+  assert.match(body("markCloudPending"), /const rows = buildCloudRows\(cloudCollections\(\), cloudContext\(\)\);/);
+  assert.match(body("markCloudPending"), /filter\(id => writable\.has\(id\)\)/);
 });
