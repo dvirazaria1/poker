@@ -1277,7 +1277,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 84</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 85</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -2784,7 +2784,7 @@
   // full pull the app already trusts. The open table keeps its own finer channel below.
   // Every table listed here must be in the supabase_realtime publication -- an unpublished one
   // fails the whole channel (docs/backend/realtime-publication.sql).
-  const CLOUD_ACCOUNT_TABLES = ["games"];
+  const CLOUD_ACCOUNT_TABLES = ["games", "groups", "group_members", "friendships", "debts"];
   let cloudAccountChannel = null;
   let cloudAccountChannelUser = "";
   let cloudAccountChannelBroken = false;

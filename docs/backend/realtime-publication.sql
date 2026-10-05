@@ -1,4 +1,4 @@
--- realtime-publication.sql -- let the home screens update live (NOT YET APPLIED)
+-- realtime-publication.sql -- let the home screens update live (APPLIED 2026-10-05)
 --
 -- Only games, game_participants and entries are in the supabase_realtime publication (checked
 -- 2026-10-05), so a phone hears about a game opening or closing, but not about a new member, a

@@ -15,7 +15,7 @@ const fnSource = name => {
 test("the account channel only names published tables, and every event becomes a debounced pull", () => {
   const list = html.match(/const CLOUD_ACCOUNT_TABLES = \[([^\]]*)\];/);
   assert.ok(list);
-  assert.deepEqual(JSON.parse("[" + list[1] + "]"), ["games"]);
+  assert.deepEqual(JSON.parse("[" + list[1] + "]"), ["games", "groups", "group_members", "friendships", "debts"]);
   assert.match(fnSource("syncCloudAccountChannel"), /\(\) => scheduleCloudPull\(600\)/);
   assert.match(html, /function enterCloudMode\(\) \{[\s\S]*?syncCloudAccountChannel\(\);/);
   assert.match(html, /function exitCloudMode\(\) \{[\s\S]*?leaveCloudAccountChannel\(\);/);
