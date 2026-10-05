@@ -613,7 +613,7 @@ test('the open table gets a realtime channel named game:<id> that is torn down w
   assert.match(storeSource, /table: "game_participants"/);
   assert.match(storeSource, /table: "games"[\s\S]*?filter: "id=eq\." \+ /);
   assert.match(storeSource, /supabase\.removeChannel\(/);
-  assert.match(storeSource, /\.subscribe\(\)/);
+  assert.match(storeSource, /\.subscribe\(status => onCloudGameChannelStatus\(/); // status callback, see cloud-read-hardening.test.cjs
   // Debounced, and never applied while an input has focus.
   assert.match(storeSource, /300/);
   assert.match(storeSource, /shouldApplyIncomingGame\(/);

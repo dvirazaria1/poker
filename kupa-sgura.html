@@ -1993,6 +1993,10 @@
   let cloudGameCreators = {}; // gameId -> games.created_by, so a second device never rewrites it
   let cloudGameChannel = null;   // the postgres_changes subscription for the open table
   let cloudGameChannelId = "";   // which game it is for ("" = none)
+  // The channel reported CHANNEL_ERROR / TIMED_OUT / CLOSED. The same-game-id shortcut in
+  // syncCloudGameChannel would otherwise keep that dead subscription forever; with this set the next
+  // foreground / online / retry / push / pull recreates it. In memory only, like the channel.
+  let cloudGameChannelBroken = false;
   let cloudGameEventTimer = null;
   let pendingCloudGame = null;   // a realtime update parked until the active input loses focus
   // Raw guests rows this pull could read (RLS already narrowed them — see
@@ -2122,6 +2126,7 @@
   // "push before pull on reconnect" both point.
   function cloudRetryNow() {
     if (!cloudMode()) return;
+    syncCloudGameChannel(); // a channel that reported an error is recreated here (no-op when healthy)
     if (cloudReconnectOrder(cloudOutboxSignal()) === "pull-then-push") { pullCloud(); return; }
     clearTimeout(cloudPushTimer);
     cloudPushTimer = null;
@@ -2200,6 +2205,8 @@
     if (marker.attempts >= 3) {
       cloudInsertReconcile = null;
       cloudSurfaceError = true;
+      // Nothing was refused: the pulls that should have confirmed the write kept failing.
+      cloudLastError = cloudSyncReason("reconcile-retries", "reads kept failing after a write");
       return;
     }
     const delay = Math.min(4000, 800 * Math.pow(2, marker.attempts));
@@ -2211,6 +2218,18 @@
     if (!authUser || authUser.id !== accountId) return;
     retryCloudInsertReconcile(accountId);
     setSync(false, "שגיאת סנכרון — נשמר מקומית");
+  }
+
+  // A read that could not be applied (a failed child table, a failed realtime read, a dead channel)
+  // goes on the dot with its table named. Offline is the one exception: nothing is wrong with the
+  // server then, the online event retries, and a red dot per foreground would only be noise.
+  function noteCloudReadFailure(failures) {
+    const info = cloudPullErrorInfo([], failures);
+    if (!info || !cloudMode()) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    cloudLastError = info;
+    cloudSurfaceError = true;
+    refreshSyncDot();
   }
 
   async function pushCloud() {
@@ -2233,7 +2252,17 @@
     // A game the server already holds as CLOSED is frozen: RLS refuses it and the immutability
     // triggers raise on any UPDATE or DELETE of it or its children. Never write to one again.
     const frozen = new Set((previous.gamesClosed || []).map(row => String(row.id)));
-    const notFrozen = row => !frozen.has(String(row.game_id || row.id || ""));
+    // A closed game somebody else created can never be inserted from this device
+    // (games_insert_member requires created_by = me), yet a history entry the player boundary left
+    // behind still looks like "a closed game the server has not seen". Never synthesize an open
+    // shell for one, never send its children or debts, and never close it: it stays local.
+    const knownGameIds = new Set((previous.games || []).map(row => String(row.id))
+      .concat((previous.gamesClosed || []).map(row => String(row.id))));
+    const foreignClosed = cloudForeignClosedGameIds(next.gamesClosed, knownGameIds, pushAccountId);
+    const notFrozen = row => {
+      const gameId = String(row.game_id || row.id || "");
+      return !frozen.has(gameId) && !foreignClosed.has(gameId);
+    };
     // A real DELETE is only ever the current open table's own undo. A game that merely dropped
     // out of the payload (a local reset, a closed game aged out of history) must never take the
     // server's rows with it.
@@ -2244,7 +2273,9 @@
         if (!pushIsCurrent()) return;
         // gamesClosed IS the frozen set, so it keeps its rows; everything else drops the rows of
         // a game the server already closed, and never deletes them either.
-        const rows = pair[0] === "gamesClosed" ? (next[pair[0]] || []) : (next[pair[0]] || []).filter(notFrozen);
+        const rows = pair[0] === "gamesClosed"
+          ? (next[pair[0]] || []).filter(row => !foreignClosed.has(String(row.id)))
+          : (next[pair[0]] || []).filter(notFrozen);
         const diff = diffCollections(previous[pair[0]] || [], rows, "id");
         // diff.deletes is deliberately not applied here: none of the group tables has a DELETE
         // policy — removal is a soft column (deleted_at / status), which the upsert carries.
@@ -2257,7 +2288,7 @@
           const known = new Set((previous.games || []).map(row => String(row.id))
             .concat((previous.gamesClosed || []).map(row => String(row.id))));
           const shells = (next.gamesClosed || [])
-            .filter(row => !known.has(String(row.id)))
+            .filter(row => !known.has(String(row.id)) && !foreignClosed.has(String(row.id)))
             .map(cloudGameOpenShell);
           upserts = upserts.concat(shells);
         }
@@ -2431,14 +2462,25 @@
       const groupIds = groupRows.map(row => row.id).filter(Boolean);
       let memberRows = [];
       let inviteRows = [];
+      // Collections whose read FAILED this pull (not "came back empty"): the apply step leaves their
+      // last-good local copy alone, and the failure is named on the dot instead of reading as synced.
+      const unavailable = [];
+      const readFailures = [];
+      const readFailed = (key, table, result) => {
+        unavailable.push(key);
+        const failure = cloudReadFailure(table, result);
+        if (failure) readFailures.push(failure);
+      };
       if (groupIds.length) {
         const membersResult = await supabase.from("group_members").select("*").in("group_id", groupIds);
         if (membersResult.error) { failCloudPull(pullAccountId); return; }
         memberRows = membersResult.data || [];
         const invitesResult = await supabase.from("invites").select("*").in("group_id", groupIds);
         if (!invitesResult.error) inviteRows = invitesResult.data || [];
+        else readFailed("invites", "invites", invitesResult);
       }
       const friendsResult = await supabase.from("friendships").select("*");
+      if (friendsResult.error) readFailed("friendships", "friendships", friendsResult);
       // games_select is app_can_read_game(): my groups' games plus any ad-hoc game I created or
       // played in. Only the most recent closed games are worth carrying to the device.
       const gamesResult = await supabase.from("games").select("*");
@@ -2450,17 +2492,28 @@
         .slice(0, CLOUD_HISTORY_LIMIT);
       const gameIds = openGames.concat(closedGames).map(row => row.id).filter(Boolean);
       const children = await fetchCloudGameChildren(gameIds);
+      // A failed child read must never look like "these games have no participants/entries": the
+      // game rows themselves are not applied this pull (applyCloudPull holds history, the open slot
+      // and the game baseline at last-good) and the failing table is named on the dot.
+      if (children.failures.length) {
+        unavailable.push("games");
+        children.failures.forEach(failure => readFailures.push(failure));
+      }
       const debtsResult = await supabase.from("debts").select("*");
+      if (debtsResult.error) readFailed("debts", "debts", debtsResult);
       // guests feeds the "זה אני" self-claim row (docs/backend/link-guest.sql) only — RLS already
       // narrows it to what this device may see, so nothing here needs its own filter. Best-effort:
       // a query error degrades to "no candidates offered" instead of failing the whole pull.
       const guestsResult = await supabase.from("guests").select("*");
+      if (guestsResult.error) readFailed("guests", "guests", guestsResult);
       // Safe group aggregates (docs/backend/group-summaries.sql, plus the existing
       // group_leaderboard_public_v) — no per-player money, computed for every closed game in a
       // group this account actively belongs to, independent of the per-participant narrowing on
       // entries/game_participants. Either view can legitimately not exist yet (the migration is
       // written but "DO NOT RUN THIS YET" until this client change ships) — a missing-relation
-      // error degrades to "aggregate unavailable", never to an empty-but-trusted result.
+      // error degrades to "aggregate unavailable", never to an empty-but-trusted result. A failure
+      // on THIS pull keeps the previous last-good aggregates (see applyCloudPull) rather than
+      // discarding a healthy view because its sibling failed.
       const leaderboardResult = await supabase.from("group_leaderboard_public_v").select("*");
       const gameSummariesResult = await supabase.from("group_game_summaries_v").select("*");
       const groupAggregatesOk = !leaderboardResult.error && !gameSummariesResult.error;
@@ -2479,6 +2532,8 @@
         groupAggregatesOk,
         groupLeaderboardRows: groupAggregatesOk ? (leaderboardResult.data || []) : [],
         groupGameSummaryRows: groupAggregatesOk ? (gameSummariesResult.data || []) : [],
+        unavailable,
+        readFailures,
       }, pullSeq, pullAccountId);
     } catch (e) {
       failCloudPull(pullAccountId);
@@ -2490,22 +2545,27 @@
   // The three child tables of a set of games, in the order the local model wants them: entries by
   // server insert time (recorded_at is always present; created_at can be NULL on a legacy row),
   // participants by seating order, transfers by the settlement's own sort_order.
+  //
+  // Every query reports its own outcome. `failures` lists the child tables whose read ERRORED
+  // (describeCloudError shape); an empty array alongside a successful read stays meaningful --
+  // player-boundary.sql legitimately returns 200 + [] to a non-participant -- but an errored read
+  // must never be dressed up as that. Callers apply nothing when `failures` is non-empty.
   async function fetchCloudGameChildren(gameIds) {
-    const empty = { participants: [], entries: [], transfers: [] };
+    const empty = { participants: [], entries: [], transfers: [], failures: [] };
     if (!supabase || !authUser) return empty;
     if (!gameIds || !gameIds.length) return empty;
     const participants = await supabase.from("game_participants").select("*")
       .in("game_id", gameIds).order("created_at", { ascending: true });
-    if (participants.error) return empty;
+    if (participants.error) return { ...empty, failures: [cloudReadFailure("game_participants", participants)] };
     const entries = await supabase.from("entries").select("*")
       .in("game_id", gameIds).order("recorded_at", { ascending: true });
     const transfers = await supabase.from("transfers").select("*")
       .in("game_id", gameIds).order("sort_order", { ascending: true });
-    return {
-      participants: participants.data || [],
-      entries: entries.error ? [] : (entries.data || []),
-      transfers: transfers.error ? [] : (transfers.data || []),
-    };
+    const failures = [];
+    if (entries.error) failures.push(cloudReadFailure("entries", entries));
+    if (transfers.error) failures.push(cloudReadFailure("transfers", transfers));
+    if (failures.length) return { ...empty, failures };
+    return { participants: participants.data || [], entries: entries.data || [], transfers: transfers.data || [], failures };
   }
   // Groups the child rows of one game together, so the mappers get exactly their own game.
   function cloudChildrenOf(gameId, payload) {
@@ -2522,12 +2582,22 @@
     // Read-only cache for the "זה אני" self-claim row (renderGroupGuestClaims) — updated even when
     // the merge below defers for a focused input, since nothing here can clobber what someone is
     // typing.
-    cloudGuestRows = payload.guests || [];
-    cloudGroupAggregates = {
-      available: !!payload.groupAggregatesOk,
-      leaderboard: payload.groupLeaderboardRows || [],
-      gameSummaries: payload.groupGameSummaryRows || [],
-    };
+    // Collections whose read failed (pullCloud's `unavailable`): their last-good local copy is
+    // never replaced by the empty list the failed query would otherwise stand in for.
+    const unavailable = new Set(Array.isArray(payload.unavailable) ? payload.unavailable : []);
+    const readFailures = Array.isArray(payload.readFailures) ? payload.readFailures : [];
+    // Child tables of the games failed: the game snapshots themselves cannot be trusted this pull.
+    const gamesHeld = unavailable.has("games");
+    if (!unavailable.has("guests")) cloudGuestRows = payload.guests || [];
+    // Replaced only by a pull where BOTH views answered; a failed query keeps the last-good pair
+    // (available:false stays the default until the first full success, so nothing is invented).
+    if (payload.groupAggregatesOk) {
+      cloudGroupAggregates = {
+        available: true,
+        leaderboard: payload.groupLeaderboardRows || [],
+        gameSummaries: payload.groupGameSummaryRows || [],
+      };
+    }
     const groupRows = payload.groups || [];
     const memberRows = payload.members || [];
     const inviteRows = payload.invites || [];
@@ -2555,6 +2625,9 @@
     (payload.openGames || []).concat(payload.closedGames || []).forEach(row => {
       if (row && row.id && row.created_by) cloudGameCreators[String(row.id)] = row.created_by;
     });
+    // The creators above came from the games query itself, which succeeded; the snapshots below
+    // are what a failed child read would corrupt, so a held pull carries no game rows to map.
+    if (gamesHeld) payload = { ...payload, openGames: [], closedGames: [] };
     const ctx = cloudContext();
     // Members first: rowsToPlayers resolves memberId against them, so the context has to know the
     // membership the server just sent, not the one this device had a moment ago.
@@ -2592,27 +2665,48 @@
     (payload.transfers || []).forEach(row => {
       if (row && row.id) transfersByGame[String(row.id)] = String(row.settlement_key || "");
     });
+    // A debt maps through its transfer's settlement key, so a held games read holds the debts too.
+    const debtsHeld = gamesHeld || unavailable.has("debts");
     const pulled = {
       groups: groupRows.map(row => rowToGroup(row, ctx)),
       groupMembers: pulledMembers,
       invites: inviteRows.map(row => rowToInvite(row, ctx)),
       friendships: friendshipRows.map(row => rowToFriendship(row, ctx)),
-      history,
-      debts: (payload.debts || []).map(row => rowToDebt(row, ctx, transfersByGame)),
+      // undefined = "not fetched": mergeCloudIntoState leaves that collection exactly as it is.
+      history: gamesHeld ? undefined : history,
+      debts: debtsHeld ? undefined : (payload.debts || []).map(row => rowToDebt(row, ctx, transfersByGame)),
       game: picked.action === "load" ? picked.game : null,
+      unavailable: Array.from(unavailable),
     };
-    const serverBaseline = buildCloudRows({
+    let serverBaseline = buildCloudRows({
       ...pulled,
       games: (picked.action === "load" && picked.game ? [gameSnapshotFromState({ ...picked.game, example: false })] : [])
         .concat(history.map(gameSnapshotFromHistory)),
       debts: pulled.debts,
     }, cloudContext());
+    // A collection that failed to read keeps its last-good baseline. Rebuilding it from the empty
+    // stand-in would make every local row look unknown to the server and re-send it, and would
+    // drop a closed game from the baseline -- the frozen-game guard pushCloudRun relies on.
+    const keepBaseline = [];
+    if (unavailable.has("invites")) keepBaseline.push("invites");
+    if (unavailable.has("friendships")) keepBaseline.push("friendships");
+    if (debtsHeld) keepBaseline.push("debts", "debtPayments");
+    if (gamesHeld) keepBaseline.push("games", "gameParticipants", "entries", "transfers", "gamesClosed");
+    if (keepBaseline.length) serverBaseline = cloudKeepPreviousRows(serverBaseline, lastPushedRows, keepBaseline, gamesHeld ? ["guests"] : []);
     // Keep the working copy untouched while resolving an ambiguous INSERT ... DO NOTHING. The
     // rebuilt server baseline makes an existing row known, so scheduleCloudPush sends the local
     // intended version through the normal UPDATE pass. A newer write aborts this pull above, and
     // a changed account cannot consume another account's reconciliation marker.
     let missingReconcileRows = [];
     if (cloudInsertReconcile && cloudInsertReconcile.accountId === authUser.id) {
+      // The games the marker may be waiting on could not be read, so this pull proves nothing about
+      // them: spend one bounded reconciliation retry instead of deciding "missing" from a baseline
+      // that was deliberately held at last-good.
+      if (gamesHeld) {
+        retryCloudInsertReconcile(authUser.id);
+        noteCloudReadFailure(readFailures);
+        return;
+      }
       missingReconcileRows = cloudRowsMissingReconcileIds(serverBaseline, cloudInsertReconcile);
       if (missingReconcileRows.length) {
         // The row is not visible in this account's SELECT snapshot (for example an RLS conflict).
@@ -2622,10 +2716,12 @@
         lastPushedRows = serverBaseline;
         cloudInsertReconcile = null;
         cloudSurfaceError = true;
+        cloudLastError = cloudPullErrorInfo(missingReconcileRows, readFailures);
       } else {
         lastPushedRows = serverBaseline;
         cloudInsertReconcile = null;
-        cloudSurfaceError = false;
+        cloudLastError = cloudPullErrorInfo([], readFailures);
+        cloudSurfaceError = !!cloudLastError;
         scheduleCloudPush();
         refreshSyncDot();
         return;
@@ -2637,7 +2733,11 @@
     // The baseline is what the SERVER holds, not what we now hold: a record the merge kept is
     // absent from it and goes up on the next push (that is the first-device seeding rule).
     lastPushedRows = serverBaseline;
-    cloudSurfaceError = missingReconcileRows.length > 0;
+    // A failed optional read (or a row that cannot be read back) keeps the dot honest instead of
+    // letting a partial pull claim "synced"; cloudLastError says which, so a red dot always
+    // explains itself.
+    cloudLastError = cloudPullErrorInfo(missingReconcileRows, readFailures);
+    cloudSurfaceError = !!cloudLastError;
     render();
     refreshSyncDot();
     syncCloudGameChannel();
@@ -2649,20 +2749,37 @@
   function syncCloudGameChannel() {
     if (!supabase || !authUser) return leaveCloudGameChannel();
     const id = (!state.example && state.phase !== "closed" && isCloudId(state.gameId)) ? String(state.gameId) : "";
-    if (id === cloudGameChannelId) return;
+    if (id === cloudGameChannelId && !cloudGameChannelBroken) return;
     leaveCloudGameChannel();
     if (!id) return;
     cloudGameChannelId = id;
     const onChange = () => scheduleCloudGamePull();
     try {
-      cloudGameChannel = supabase.channel("game:" + id)
+      const channel = supabase.channel("game:" + id)
         .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: "id=eq." + id }, onChange)
         .on("postgres_changes", { event: "*", schema: "public", table: "game_participants", filter: "game_id=eq." + id }, onChange)
-        .on("postgres_changes", { event: "*", schema: "public", table: "entries", filter: "game_id=eq." + id }, onChange)
-        .subscribe();
+        .on("postgres_changes", { event: "*", schema: "public", table: "entries", filter: "game_id=eq." + id }, onChange);
+      cloudGameChannel = channel;
+      channel.subscribe(status => onCloudGameChannelStatus(channel, id, status));
     } catch (e) {
       cloudGameChannel = null;
       cloudGameChannelId = "";
+    }
+  }
+  // The subscription's own verdict. SUBSCRIBED (the first join AND every re-join after a drop) is
+  // when events may have been missed, so it always runs a catch-up read of the game; the three
+  // failure statuses mark the channel for recreation and say so on the dot. A callback from a
+  // channel that has since been replaced (leaveCloudGameChannel's own CLOSED included) is ignored.
+  function onCloudGameChannelStatus(channel, gameId, status) {
+    if (cloudGameChannel !== channel || cloudGameChannelId !== gameId) return;
+    if (status === "SUBSCRIBED") {
+      cloudGameChannelBroken = false;
+      scheduleCloudGamePull();
+      return;
+    }
+    if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+      cloudGameChannelBroken = true;
+      noteCloudReadFailure([describeCloudError(tagCloudError({ code: String(status), message: "live updates are down" }, "realtime"))]);
     }
   }
   function leaveCloudGameChannel() {
@@ -2671,6 +2788,7 @@
     const channel = cloudGameChannel;
     cloudGameChannel = null;
     cloudGameChannelId = "";
+    cloudGameChannelBroken = false;
     if (!supabase || !channel) return;
     try { supabase.removeChannel(channel); } catch (e) {}
   }
@@ -2684,19 +2802,37 @@
   }
   async function pullCloudGame(gameId) {
     if (!supabase || !authUser || !gameId) return;
+    // The same three guards the full pull carries, captured BEFORE the first await: the account
+    // that asked, the write counter the read is older than, and the table this read is for.
+    const accountId = authUser.id;
+    const readSeq = cloudWriteSeq;
+    const stale = () => !authUser || authUser.id !== accountId || String(cloudGameChannelId) !== String(gameId);
     try {
       const gameResult = await supabase.from("games").select("*").eq("id", gameId).maybeSingle();
-      if (gameResult.error || !gameResult.data) return;
+      if (stale()) return;
+      if (gameResult.error) { noteCloudReadFailure([cloudReadFailure("games", gameResult)]); return; }
+      // 200 + null: the row is no longer visible to this account (closed-and-aged-out, access
+      // changed, deleted). The full pull reconciles that lifecycle; this fast path must not guess.
+      if (!gameResult.data) { pullCloud(); return; }
       const row = gameResult.data;
       // A close is more than the table: history, debts and the emptied slot all move, so it goes
       // through the full pull rather than the game-only fast path.
       if (row.phase === "closed") { pullCloud(); return; }
       const children = await fetchCloudGameChildren([gameId]);
-      applyCloudGame(row, children.participants, children.entries, children.transfers);
+      if (stale()) return;
+      // A failed child read is not an empty table: keep last-good and name the failing table.
+      if (children.failures.length) { noteCloudReadFailure(children.failures); return; }
+      // A local write landed while the reads were out: this snapshot is older than the device.
+      if (readSeq !== cloudWriteSeq) { scheduleCloudGamePull(); return; }
+      applyCloudGame(row, children.participants, children.entries, children.transfers, accountId);
     } catch (e) {}
   }
-  function applyCloudGame(gameRow, participantRows, entryRows, transferRows) {
+  function applyCloudGame(gameRow, participantRows, entryRows, transferRows, accountId) {
     if (!authUser) return;
+    if (accountId && authUser.id !== accountId) return;
+    // The same participant-boundary predicate as the full pull: an empty participant list is only
+    // a real empty table for the game's creator; for anybody else it is RLS denying the read.
+    if (!cloudGameChildrenAreTrustworthy(gameRow, participantRows, authUser.id)) return;
     // Same rule as the full pull: a game already in this device's history stays closed here.
     if ((state.history || []).some(entry => entry && String(entry.gameId) === String(gameRow.id))) return;
     const incoming = buildOpenGameFromCloud(gameRow, participantRows, entryRows, transferRows, cloudContext());
@@ -5142,6 +5278,9 @@
     const s = state || {};
     const p = pulled || {};
     const keep = new Set(((options || {}).keepLocalIds || []).map(String));
+    // Collections whose READ failed this pull. Omitted from replacement, not replaced with [] --
+    // an empty list from a failed query is not the server's answer, and last-good local data wins.
+    const unavailable = new Set(Array.isArray(p.unavailable) ? p.unavailable : []);
     const byId = list => {
       const map = new Map();
       (Array.isArray(list) ? list : []).forEach(record => {
@@ -5186,11 +5325,11 @@
           const before = prevMembers.get(String(m.id));
           return before ? { ...m, hiddenAt: before.hiddenAt } : m;
         }),
-        invites: mergeKept(p.invites, s.invites, i => i),
+        invites: unavailable.has("invites") ? s.invites : mergeKept(p.invites, s.invites, i => i),
         // A friendship row has no name column, so a pulled row can arrive with an empty
         // displayName on the other party. Whatever this device already knew about that
         // person survives, exactly like a group's avatarDataUrl above.
-        friendships: mergeKept(p.friendships, s.friendships, f => {
+        friendships: unavailable.has("friendships") ? s.friendships : mergeKept(p.friendships, s.friendships, f => {
           const before = prevFriendships.get(String(f.id));
           if (!before) return f;
           return { ...f, requester: keptRefName(f.requester, before.requester),
@@ -5314,6 +5453,66 @@
     if (!info) return "";
     return [info.table, info.code].filter(Boolean).join(" ") + (info.message ? ": " + info.message : "") +
       (info.row ? "\n" + info.row : "");
+  }
+  // A failed READ, shaped exactly like a refused write so the dot's detail line (cloudErrorDetail)
+  // names the table the same way. supabase-js hands back { data, error, status } and never throws
+  // for a query error, so the result -- not an exception -- is what this describes.
+  function cloudReadFailure(table, result) {
+    const r = result || {};
+    const err = r.error || {};
+    return describeCloudError(tagCloudError({ code: err.code, status: r.status, message: err.message }, table));
+  }
+  // Why the dot is red when no write was refused: the two reconciliation-only routes (a written
+  // row that cannot be read back; reads that kept failing after a write) used to flip the flag
+  // without assigning any reason, so the dot showed nothing or a stale one. "sync" is not a table:
+  // it names the sync engine itself, and the code says which route fired.
+  function cloudSyncReason(code, message) {
+    return { table: "sync", code: String(code || ""), message: String(message || "").slice(0, 120), row: "" };
+  }
+  // The one reason a successful (possibly partial) pull leaves on the dot: a failed optional read
+  // wins over a missing reconcile row, because it names an actual table. null = nothing to show.
+  function cloudPullErrorInfo(missingReconcileRows, readFailures) {
+    const failures = (Array.isArray(readFailures) ? readFailures : []).filter(Boolean);
+    if (failures.length) {
+      const tables = Array.from(new Set(failures.map(f => f.table).filter(Boolean)));
+      const first = failures[0];
+      return { table: tables.join("+"), code: first.code || "", message: ("read failed" + (first.message ? ": " + first.message : "")).slice(0, 120), row: "" };
+    }
+    if (Array.isArray(missingReconcileRows) && missingReconcileRows.length) {
+      const names = missingReconcileRows.slice(0, 2).map(s => String(s).replace(/(:[^:]{8})[^:]*$/, "$1")).join(", ");
+      return cloudSyncReason("reconcile-missing", "written row not readable back: " + names);
+    }
+    return null;
+  }
+  // When a collection's read failed, the diff baseline for it must stay what it was (last-good),
+  // not become the empty set the failed read would otherwise rebuild: an empty baseline makes every
+  // local row look unknown to the server and re-sends it, and a lost closed-game baseline is exactly
+  // how a frozen game stops being frozen. keepKeys are copied from `previous`; unionKeys keep the
+  // freshly built rows and add the ones only `previous` knew (guests are derived, never read).
+  function cloudKeepPreviousRows(baseline, previous, keepKeys, unionKeys) {
+    const out = { ...(baseline || {}) };
+    const prev = previous || {};
+    (Array.isArray(keepKeys) ? keepKeys : []).forEach(key => { if (Array.isArray(prev[key])) out[key] = prev[key]; });
+    (Array.isArray(unionKeys) ? unionKeys : []).forEach(key => {
+      const fresh = Array.isArray(out[key]) ? out[key] : [];
+      const have = new Set(fresh.map(row => String(row && row.id)));
+      out[key] = fresh.concat((Array.isArray(prev[key]) ? prev[key] : []).filter(row => row && !have.has(String(row.id))));
+    });
+    return out;
+  }
+  // games_insert_member requires created_by = me, so a closed game somebody else created can never
+  // be inserted from this device -- yet a history entry the player boundary left behind still
+  // looks like "a closed game the server has not seen" and used to be re-sent as an open shell plus
+  // children on every push. These are the closed game ids a push must leave local: not yet known
+  // to the server baseline AND not created by this account.
+  function cloudForeignClosedGameIds(closedRows, knownIds, accountId) {
+    const known = knownIds && typeof knownIds.has === "function" ? knownIds : new Set((Array.isArray(knownIds) ? knownIds : []).map(String));
+    const out = new Set();
+    (Array.isArray(closedRows) ? closedRows : []).forEach(row => {
+      if (!row || row.id == null || known.has(String(row.id))) return;
+      if (String(row.created_by || "") !== String(accountId || "")) out.add(String(row.id));
+    });
+    return out;
   }
 
   function classifyCloudError(error) {
