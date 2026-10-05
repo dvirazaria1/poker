@@ -530,6 +530,9 @@ calls must stay executable by the role the policy applies to; revoke only `publi
 Also on 2026-10-05: `fresh-start-2026-10-05.sql` (owner ran it: every table but `profiles` emptied, paired
 with DATA_EPOCH 1 in the client) and `friend-invite-search-path.sql` (pgcrypto lives in `extensions`
 on Supabase; a SECURITY DEFINER function pinned to `search_path = public` cannot see it).
+`realtime-publication.sql` (2026-10-05) added groups, group_members, friendships and debts to
+`supabase_realtime`; the client's account channel (`CLOUD_ACCOUNT_TABLES`) listens to exactly the
+published set -- add a table to both, publication first.
 Each was verified live afterwards with an anonymous `curl` (every SECURITY DEFINER function and view must
 answer `401 permission denied`, never 200/404), and `node tools/rls-probe.mjs` reports 0 findings.
 Google OAuth consent screen is **In production**. Version 65 ships `state.games` as the authoritative
