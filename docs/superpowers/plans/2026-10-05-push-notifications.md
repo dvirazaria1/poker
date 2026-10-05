@@ -159,3 +159,24 @@ REVOKE ALL ON FUNCTION app_notify_event() FROM public, anon, authenticated;
 ```
 
 Verification: open a group game on phone A → phone B (notifications on, app closed) is notified; close a game with a debt → both parties notified; creditor marks paid → debtor notified.
+
+---
+
+## Revision after the adversarial review (`.superpowers/codex-plans-review.md`, P1–P10)
+
+The direct "trigger → pg_net `{kind, id}` → function re-reads the row" design is replaced by a
+**server-side outbox**, implemented in `docs/backend/push-notifications.sql` and
+`supabase/functions/notify/index.ts`:
+
+| Finding | Resolution in the implementation |
+|---|---|
+| P1 public key could trigger historical notifications | Events are written only by triggers into `notification_events` (no client grant). The function takes no input; it is woken by `app_wake_notifier()` with a Vault-generated secret header and only drains the outbox. |
+| P2 log written before delivery | Per-event status `pending → sending → sent/skipped/failed`; `sent` only after a push service accepted; retryable errors return to `pending` (≤5 attempts); stale claims re-claimable after 2 min (`FOR UPDATE SKIP LOCKED`). |
+| P3 arbitrary endpoints | `app_save_push_subscription` accepts only FCM / Apple / Mozilla / WNS hosts, validates key shapes, keeps ≤5 subscriptions per profile; tests go through the outbox, one per minute. |
+| P4 account switch | `exitCloudMode` (any sign-out, session loss, account takeover) unsubscribes the device; `enterCloudMode` re-saves an existing subscription for the signed-in account; "פעיל" shows only after this session saved it. |
+| P5 deleted accounts | The claim skips recipients without an `auth.users` row and deletes their subscriptions. |
+| P6 enqueue error aborts writes | Every trigger body and the wake call are wrapped in `EXCEPTION WHEN OTHERS THEN RAISE WARNING`. |
+| P7 stale/contradictory debt messages | Content captured at event time; created and paid share the tag `debt-<id>` so the newer replaces the older on the device. |
+| P8 debts never retried after a close | Client: debts are exempt from the frozen-game filter in `pushCloudRun` (insert-only, allowed after close). |
+| P9 trigger auth untested | The in-app test goes through the same outbox + wake path as real events. |
+| P10 platform gates | Owner verification on the installed iPhone before announcing the feature. |

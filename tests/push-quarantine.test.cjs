@@ -46,3 +46,7 @@ test("the quarantine is released on boot and on a dot tap, and never counts as w
   assert.match(fn("cloudRetryNow"), /releaseCloudQuarantine\(\);/);
   assert.match(fn("cloudOutboxSignal"), /cloudQuarantinedIds\(\)/);
 });
+
+test("a debt that failed to upload after its game closed is retried, not dropped as frozen (review P8)", () => {
+  assert.match(fn("pushCloudRun"), /: pair\[0\] === "debts" \? \(next\[pair\[0\]\] \|\| \[\]\)\.filter\(row => !foreignClosed\.has\(String\(row\.game_id\)\)\)/);
+});

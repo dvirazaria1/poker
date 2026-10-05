@@ -1245,6 +1245,11 @@
       <p class="games-primary-reason">ההתחברות הצליחה אבל לא הצלחנו לטעון את החשבון.</p>
       <button type="button" class="set-flat" id="setProfileRetryBtn">נסו שוב</button>
     </div>
+    <div class="set-push" id="setPush" hidden>
+      <p class="games-primary-reason" id="setPushNote"></p>
+      <button type="button" class="set-flat" id="setPushBtn">הפעל התראות</button>
+      <button type="button" class="set-flat" id="setPushTestBtn" hidden>שלח התראת ניסיון</button>
+    </div>
     <p class="games-primary-reason" id="setSignInNote" hidden>המשחקים שלך נשמרים רק במכשיר הזה.</p>
     <button type="button" class="set-flat" id="setSignInBtn" hidden>התחבר עם חשבון</button>
     <button type="button" class="set-flat" id="setSwapBtn">התנתקות</button>
@@ -2350,8 +2355,12 @@
         if (!pushIsCurrent()) return;
         // gamesClosed IS the frozen set, so it keeps its rows; everything else drops the rows of
         // a game the server already closed, and never deletes them either.
+        // Debts are exempt from the frozen filter: they are written AFTER the close, insert-only
+        // (DO NOTHING) and debts_insert_on_close allows them on a closed game -- so a debt whose
+        // insert failed right after a successful close is retried instead of dropped for good.
         const rows = (pair[0] === "gamesClosed"
           ? (next[pair[0]] || []).filter(row => !foreignClosed.has(String(row.id)))
+          : pair[0] === "debts" ? (next[pair[0]] || []).filter(row => !foreignClosed.has(String(row.game_id)))
           : (next[pair[0]] || []).filter(notFrozen))
           .filter(row => !cloudQuarantineSkips(row, quarantined));
         const diff = diffCollections(previous[pair[0]] || [], rows, "id");
@@ -3059,6 +3068,7 @@
   function enterCloudMode() {
     if (!supabase || !authUser) return;
     releaseCloudQuarantine();
+    reconcilePushOwnership();
     clearTimeout(saveTimer);
     saveTimer = null;
     gameDoc = null;
@@ -3096,6 +3106,10 @@
     cloudGroupAggregates = { available: false, leaderboard: [], gameSummaries: [] };
     pendingCloudGameIds = new Set();
     cloudDiscardedGameIds = new Set();
+    // Signed out, session lost, or another account took over: this device stops receiving the old
+    // account's notifications (review finding P4). Best effort; a dead endpoint is cleaned up by
+    // the sender on its next 404/410.
+    disablePushNotifications();
     leaveCloudGameChannel();
     leaveCloudAccountChannel();
     setSync(false, "שמירה מקומית");
@@ -9858,6 +9872,123 @@
     const identities = Array.isArray(user.identities) ? user.identities : [];
     return identities.some(i => i && i.provider === "google");
   }
+  // ---------- push notifications (docs/superpowers/plans/2026-10-05-push-notifications.md) ----------
+  // The public half of the VAPID pair; the private half lives only in the notify Edge Function's
+  // secrets. The device's state comes from the browser (permission + subscription) and from
+  // whether THIS session registered it for THIS account -- no localStorage of its own.
+  const VAPID_PUBLIC = "BFvCbiE7zfajq0ySYiYgfhcglxr-oMYKDXxysVLnkCHqKBPNjziBuKj2FshQFfEgLMHaTQpmgfTkAfDeB7-YVts";
+  let pushRegisteredFor = null;   // profile id the current subscription was saved for this session
+  let pushBusy = false;
+  let pushMessage = "";
+  function pushSupport() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      // iOS only exposes PushManager to an app installed on the home screen (16.4+).
+      const ios = /iP(hone|ad|od)/.test(navigator.userAgent);
+      return ios ? "install" : "unsupported";
+    }
+    return "ok";
+  }
+  function vapidKeyBytes() {
+    const b64 = VAPID_PUBLIC.replace(/-/g, "+").replace(/_/g, "/");
+    const raw = atob(b64 + "=".repeat((4 - b64.length % 4) % 4));
+    return Uint8Array.from(raw, c => c.charCodeAt(0));
+  }
+  async function currentPushSubscription() {
+    if (pushSupport() !== "ok") return null;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      return await reg.pushManager.getSubscription();
+    } catch (e) { return null; }
+  }
+  async function savePushSubscription(sub) {
+    if (!supabase) return false;
+    const json = sub.toJSON();
+    const { error } = await supabase.rpc("app_save_push_subscription", {
+      p_endpoint: json.endpoint, p_p256dh: json.keys && json.keys.p256dh, p_auth: json.keys && json.keys.auth,
+      p_user_agent: navigator.userAgent,
+    });
+    if (error) { console.warn("push: save refused", error.message); return false; }
+    pushRegisteredFor = authUser ? authUser.id : null;
+    return true;
+  }
+  // Only from the button's own tap: iOS shows the permission prompt for a user gesture only.
+  async function enablePushNotifications() {
+    if (!supabase) return;
+    if (!cloudMode() || pushBusy) return;
+    pushBusy = true; pushMessage = ""; refreshPushRow();
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        pushMessage = "ההתראות חסומות. אפשר לאשר אותן בהגדרות הטלפון.";
+        return;
+      }
+      const reg = await navigator.serviceWorker.ready;
+      const sub = (await reg.pushManager.getSubscription())
+        || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKeyBytes() });
+      if (!(await savePushSubscription(sub))) pushMessage = "לא הצלחנו להפעיל התראות, נסו שוב.";
+    } catch (e) {
+      console.warn("push: enable failed", e);
+      pushMessage = "לא הצלחנו להפעיל התראות, נסו שוב.";
+    } finally {
+      pushBusy = false;
+      refreshPushRow();
+    }
+  }
+  async function disablePushNotifications() {
+    if (!supabase) return;
+    const sub = await currentPushSubscription();
+    pushRegisteredFor = null;
+    if (sub) {
+      try { await supabase.rpc("app_delete_push_subscription", { p_endpoint: sub.endpoint }); } catch (e) {}
+      try { await sub.unsubscribe(); } catch (e) {}
+    }
+  }
+  async function sendTestNotification() {
+    if (!supabase) return;
+    if (!cloudMode() || pushBusy) return;
+    pushBusy = true; pushMessage = ""; refreshPushRow();
+    try {
+      const { error } = await supabase.rpc("app_send_test_notification");
+      pushMessage = error ? (/one test a minute/.test(error.message || "") ? "אפשר לשלוח ניסיון אחד בדקה." : "השליחה נכשלה, נסו שוב.")
+        : "נשלחה. היא אמורה להגיע תוך כמה שניות.";
+    } catch (e) {
+      pushMessage = "השליחה נכשלה, נסו שוב.";
+    } finally {
+      pushBusy = false;
+      refreshPushRow();
+    }
+  }
+  // A session became ready: a subscription that already exists on this device is (re)saved for
+  // the account now signed in -- the same person reopening the app, since any sign-out or
+  // account loss unsubscribes the device (exitCloudMode) before another account can see it.
+  async function reconcilePushOwnership() {
+    if (!cloudMode() || pushSupport() !== "ok" || Notification.permission !== "granted") return;
+    const sub = await currentPushSubscription();
+    if (sub && cloudMode()) await savePushSubscription(sub);
+    refreshPushRow();
+  }
+  function refreshPushRow() {
+    const row = document.getElementById("setPush");
+    if (!row) return;
+    row.hidden = !cloudMode();
+    if (row.hidden) return;
+    const note = document.getElementById("setPushNote");
+    const btn = document.getElementById("setPushBtn");
+    const test = document.getElementById("setPushTestBtn");
+    const support = pushSupport();
+    const on = support === "ok" && Notification.permission === "granted" && !!authUser && pushRegisteredFor === authUser.id;
+    btn.hidden = support !== "ok" || on;
+    btn.disabled = pushBusy;
+    btn.textContent = pushBusy ? "רגע…" : "הפעל התראות";
+    test.hidden = !on;
+    test.disabled = pushBusy;
+    note.textContent = pushMessage
+      || (support === "install" ? "התראות זמינות כשהאפליקציה מותקנת במסך הבית."
+        : support === "unsupported" ? "הדפדפן הזה לא תומך בהתראות."
+        : on ? "התראות פעילות: משחק שנפתח בקבוצה, חובות, ובקשות חברות."
+        : "קבלו התראה כשנפתח משחק בקבוצה, על חובות, ועל בקשות חברות.");
+  }
+
   function refreshSettings() {
     document.getElementById("setAvatar").textContent = me ? me.trim()[0] : "?";
     document.getElementById("setName").textContent = me || "אורח";
@@ -9877,6 +10008,7 @@
     document.getElementById("setSignInBtn").hidden = !canSignIn;
     document.getElementById("setSwapBtn").hidden = !sessionHeld;
     renderAuthProfileState();
+    refreshPushRow();
     document.getElementById("setSwapBtn").textContent = "התנתקות";
     // Danger zone: account deletion only makes sense for a signed-in account.
     document.getElementById("setDangerTitle").hidden = !authUser;
@@ -9984,6 +10116,8 @@
     document.getElementById("settings").hidden = true;
     showLogin();
   });
+  document.getElementById("setPushBtn").addEventListener("click", enablePushNotifications);
+  document.getElementById("setPushTestBtn").addEventListener("click", sendTestNotification);
   document.getElementById("setSwapBtn").addEventListener("click", () => {
     signOutAccount(); // ends the Supabase session first when there is one; no-op in local mode
     me = null; saveMe();

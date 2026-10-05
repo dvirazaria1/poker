@@ -109,3 +109,30 @@ self.addEventListener("fetch", (e) => {
       .catch(fallback)
   );
 });
+
+// Web Push (docs/superpowers/plans/2026-10-05-push-notifications.md). The payload is what the
+// notify Edge Function sent: { title, body, url, tag }. A shared tag (e.g. one debt's "you owe"
+// and its later "paid") lets the newer notification replace the older one on the device.
+self.addEventListener("push", (e) => {
+  let data = {};
+  try { data = e.data ? e.data.json() : {}; } catch (err) {}
+  e.waitUntil(self.registration.showNotification(data.title || "סוגרים קופה", {
+    body: data.body || "",
+    tag: data.tag || undefined,
+    icon: "icon-192.png",
+    badge: "icon-192.png",
+    data: { url: data.url || "./" },
+  }));
+});
+
+// Tapping a notification brings the app forward (an open window first, a new one otherwise).
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || "./", self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+    for (const client of list) {
+      if ("focus" in client) return client.focus();
+    }
+    return self.clients.openWindow ? self.clients.openWindow(url) : undefined;
+  }));
+});
