@@ -1,5 +1,5 @@
 -- =====================================================================
--- invite-helper-grant.sql -- restores invite creation (NOT YET APPLIED)
+-- invite-helper-grant.sql -- restores invite creation (APPLIED 2026-10-05: auth_exec=true, anon_exec=false, anon RPC 401)
 --
 -- What broke: the follow-up REVOKE at the end of link-guest.sql (applied
 -- 2026-09-10) took EXECUTE on app_guest_bindable_to_invite away from
