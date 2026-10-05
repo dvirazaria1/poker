@@ -78,22 +78,16 @@ test('the bar\'s height stays pinned (the earlier fix) and .kb-open still slides
   assert.match(kbOpenBody, /opacity:\s*0/);
 });
 
-// ---------- the remaining movement was iOS Safari's collapsing toolbar ----------
+// ---------- the remaining movement: iOS standalone shrinks the viewport on non-scrolling pages ----------
 
-test('the bar compensates for the browser chrome, in CSS, with nothing to keep in sync', () => {
-  // Measured in Chromium the bar never moved (top 750 / bottom 808 on every tab, scrolled or
-  // not) and nothing in its ancestor chain creates a containing block — `position: fixed` was
-  // already correct. iOS Safari positions a fixed element against the LARGE viewport, so while
-  // its toolbar is showing the bar sits behind that chrome and springs up when it collapses;
-  // switching tabs flips that state, which is what the owner sees.
-  const guard = html.match(/@supports \(height: 100dvh\) and \(height: 100lvh\) \{[^}]*\}[^}]*\}/);
-  assert.ok(guard, 'the compensation must be behind an @supports guard, so older engines keep the plain rule');
-  // (100lvh - 100dvh) IS the height of the browser UI currently on screen: 0 when hidden, its
-  // full height when showing.
-  assert.match(guard[0], /bottom: calc\(10px \+ env\(safe-area-inset-bottom, 0px\) \+ \(100lvh - 100dvh\)\)/);
-  // One mechanism only: a JS listener doing the same sum would double-count it.
-  assert.doesNotMatch(html, /--vv-offset/, 'the JS pin was replaced by this rule, not stacked with it');
-  assert.doesNotMatch(html, /initTabbarViewportPin/);
-  // The keyboard still gets its own treatment, which this must not have disturbed.
+test('every page is one pixel taller than the large viewport, so iOS never switches viewports between tabs', () => {
+  // v76 readout on the owner's home-screen app: games tab (scrollable) innerHeight 852, bar
+  // 750-808; friends tab (not scrollable) innerHeight 793, bar 632-690. The viewport itself
+  // changed by the 59px status-bar inset, and the (100lvh - 100dvh) term then added the same 59px
+  // again. Both are gone: no page is short enough to trigger the small viewport.
+  assert.match(ruleBody('  body {'), /min-height: calc\(100vh \+ 1px\)/);
+  assert.match(html, /@supports \(height: 100lvh\) \{\s*body \{ min-height: calc\(100lvh \+ 1px\); \}/);
+  assert.doesNotMatch(html, /100lvh - 100dvh/, 'the toolbar compensation added the inset a second time in standalone mode');
+  assert.doesNotMatch(html, /--vv-offset/);
   assert.match(html, /\.tabbar\.kb-open \{[^}]*translateY/);
 });

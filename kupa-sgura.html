@@ -43,6 +43,16 @@
     line-height: 1.5;
     direction: rtl;
     transition: background-color .3s, color .3s;
+    /* Measured on the owner's iPhone, installed to the home screen (v76 sync-dot readout):
+       a page that can scroll gets an 852px viewport (innerHeight 852); a page that cannot gets
+       793px, the screen minus the 59px status-bar inset. Every fixed element is laid out against
+       whichever one is current, so the tab bar sat 59px higher on the short friends tab than on
+       the long games tab. One pixel taller than the large viewport makes every page scrollable,
+       so the viewport -- and the bar -- is the same on every tab. */
+    min-height: calc(100vh + 1px);
+  }
+  @supports (height: 100lvh) {
+    body { min-height: calc(100lvh + 1px); }
   }
   .wrap {
     max-width: 520px; margin: 0 auto;
@@ -153,17 +163,8 @@
   :root[data-theme="light"] { --bar-bg: rgba(245,248,249,.9); }
   html { background: var(--bg); }
   .tabbar {
-    /* Why this is not just `bottom: 10px`.
-       iOS Safari positions a fixed element against the LARGE viewport — the page as it is when
-       the browser's own toolbar is hidden. While that toolbar is showing, the bottom of that
-       viewport is behind it, so the bar is pushed down under the chrome; when the toolbar
-       collapses the bar springs back up. Switching tabs flips that state (a short screen cannot
-       scroll, so the toolbar stays out; a long one lets it collapse), which is exactly the
-       "the bar moves when I change tabs" the owner sees — and it never reproduces in a desktop
-       browser, which has no collapsing toolbar.
-       (100lvh - 100dvh) IS the height of the browser UI currently on screen: 0 when it is hidden,
-       its full height when it is showing. Adding it keeps the bar the same distance above what
-       the eye actually sees, in both states, with no JS and nothing to keep in sync. */
+    /* Fixed to the viewport, 10px above the home indicator. What keeps it from moving between
+       tabs is the body's min-height below, not anything here. */
     position: fixed;
     bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     inset-inline: 17px; margin-inline: auto;
@@ -175,9 +176,6 @@
     padding: 6px 10px;
     box-shadow: 0 8px 28px rgba(0,0,0,.35);
     transition: transform .25s ease, opacity .25s ease;
-  }
-  @supports (height: 100dvh) and (height: 100lvh) {
-    .tabbar { bottom: calc(10px + env(safe-area-inset-bottom, 0px) + (100lvh - 100dvh)); }
   }
   :root[data-theme="light"] .tabbar { box-shadow: 0 8px 24px rgba(12,21,25,.14); }
   .tabbar.kb-open { transform: translateY(120px); opacity: 0; pointer-events: none; }
@@ -1256,7 +1254,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 76</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 77</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
