@@ -1,0 +1,24 @@
+const test = require("node:test");
+const assert = require("node:assert");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const html = fs.readFileSync(path.join(__dirname, "..", "kupa-sgura.html"), "utf8");
+const body = name => {
+  const start = Math.max(html.indexOf("  function " + name + "("), html.indexOf("  async function " + name + "("));
+  return html.slice(start, html.indexOf("\n  }\n", start));
+};
+
+test("legacy setSync never reads an undeclared detail (it threw on sign-out and on read failures)", () => {
+  assert.doesNotMatch(body("setSync"), /\bdetail\b/);
+});
+
+test("setCloudSync carries the refused table/code onto the dot, where a tap can show it", () => {
+  assert.match(body("setCloudSync"), /d\.dataset\.detail = detail/);
+  assert.match(html, /addEventListener\("click", \(\) => \{ showSyncDetail\(\); cloudRetryNow\(\); \}\)/);
+});
+
+test("debt payments and child deletes name their own table", () => {
+  assert.doesNotMatch(html, /\.eq\("id", payment\.id\);\s+if \(!pushIsCurrent\(\)\) return;\s+if \(result && result\.error\) throw tagCloudError\(result\.error, pair\[1\]\)/);
+  assert.match(body("pushCloudGameDeletes"), /tagCloudError\(result\.error, table\)/);
+});

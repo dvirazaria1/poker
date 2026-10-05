@@ -92,6 +92,19 @@
   .dot.waiting { background: var(--dim); box-shadow: none; animation: waitPulse 3.2s ease-in-out infinite; }
   /* שגיאת שמירה — the one state red is earned for; steady (not pulsing) reads as "needs a look". */
   .dot.error { background: var(--bad); box-shadow: 0 0 8px var(--bad); animation: none; }
+  .sync-detail {
+    position: fixed; z-index: 60;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    inset-inline: 16px; margin: 0 auto; max-width: 440px;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 12px; font-size: 12px; line-height: 1.5;
+    white-space: pre-line; overflow-wrap: anywhere;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    opacity: 0; transform: translateY(-6px);
+    transition: opacity .22s ease, transform .22s ease;
+  }
+  .sync-detail.show { opacity: 1; transform: none; }
   @keyframes breathe { 50% { box-shadow: 0 0 14px var(--accent); opacity: .7; } }
   @keyframes syncPulse { 50% { box-shadow: 0 0 14px var(--accent); opacity: .5; } }
   @keyframes waitPulse { 50% { opacity: .45; } }
@@ -1243,7 +1256,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 75</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 76</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -1389,6 +1402,7 @@
   </div>
   <header class="load-in">
     <div class="eyebrow"><button type="button" class="dot" id="syncDot" title="מצב סנכרון" aria-label="מצב סנכרון"></button></div>
+    <p class="sync-detail" id="syncDetail" role="status" aria-live="polite" dir="auto" hidden></p>
     <div class="table-header" id="tableHeader" hidden></div>
   </header>
 
@@ -1749,9 +1763,7 @@
     // The legacy (non-cloud) sync path only ever has two states; clear any leftover cloud-mode
     // class so a sign-out (or the Claude-document fallback) never leaves a stale waiting/error dot.
     d.classList.remove("syncing", "waiting", "error");
-    // The visible/assistive label stays the same four short states; the detail rides on title so
-    // a long press or a hover names the table and code without cluttering the dot.
-    d.title = detail ? label + " — " + detail : label;
+    d.title = label;
     d.setAttribute("aria-label", label);
   }
 
@@ -1995,7 +2007,10 @@
     d.classList.toggle("syncing", kind === "syncing");
     d.classList.toggle("waiting", kind === "waiting");
     d.classList.toggle("error", kind === "error");
-    d.title = label;
+    // The visible/assistive label stays the four short states; the failing table and code ride on
+    // the dot's data so a tap can show them (title never surfaces on a touch screen).
+    d.title = detail ? label + " — " + detail : label;
+    d.dataset.detail = detail || "";
     d.setAttribute("aria-label", label);
   }
   function refreshSyncDot() {
@@ -2104,7 +2119,33 @@
   // Tap the sync dot to force a retry -- a no-op in every other mode (cloudRetryNow itself is the
   // only guard needed) and harmless mid-sync since pushCloud/pullCloud are already re-entrant.
   const syncDotEl = document.getElementById("syncDot");
-  if (syncDotEl) syncDotEl.addEventListener("click", cloudRetryNow);
+  if (syncDotEl) syncDotEl.addEventListener("click", () => { showSyncDetail(); cloudRetryNow(); });
+  // A tap names the state in words, and for an error the refused table and code -- the one place
+  // the phone can show it. The second line is viewport geometry, so a screenshot of two tabs
+  // answers whether the tab bar moved because the viewport changed or because the bar did.
+  let syncDetailTimer = null;
+  function showSyncDetail() {
+    const box = document.getElementById("syncDetail");
+    if (!box || !syncDotEl) return;
+    const lines = [syncDotEl.getAttribute("aria-label") || ""];
+    if (syncDotEl.dataset.detail) lines.push(syncDotEl.dataset.detail);
+    const vv = window.visualViewport;
+    const bar = document.querySelector(".tabbar");
+    const r = bar ? bar.getBoundingClientRect() : null;
+    const standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+    lines.push("vp " + window.innerHeight + "/" + (vv ? Math.round(vv.height) + "+" + Math.round(vv.offsetTop) : "-") +
+      "/" + document.documentElement.clientHeight + " doc " + document.documentElement.scrollHeight +
+      " y " + Math.round(window.scrollY) + " bar " + (r ? Math.round(r.top) + "-" + Math.round(r.bottom) : "-") +
+      (standalone ? " pwa" : " web"));
+    box.textContent = lines.filter(Boolean).join("\n");
+    box.hidden = false;
+    requestAnimationFrame(() => box.classList.add("show"));
+    clearTimeout(syncDetailTimer);
+    syncDetailTimer = setTimeout(() => {
+      box.classList.remove("show");
+      setTimeout(() => { box.hidden = true; }, 250);
+    }, 8000);
+  }
 
   function scheduleCloudPush() {
     if (!supabase || !authUser) return;
@@ -2263,7 +2304,7 @@
           .update({ status: payment.status, paid_at: payment.paid_at, paid_by_profile_id: payment.paid_by_profile_id })
           .eq("id", payment.id);
         if (!pushIsCurrent()) return;
-        if (result && result.error) throw tagCloudError(result.error, pair[1]);
+        if (result && result.error) throw tagCloudError(result.error, "debts");
       }
       confirmed.debtPayments = next.debtPayments;
       (next.games || []).concat(next.gamesClosed || []).forEach(row => {
@@ -2319,7 +2360,7 @@
     if (!ids.length) return;
     const result = await supabase.from(table).delete().in("id", ids);
     if (!authUser || authUser.id !== deleteAccountId) return;
-    if (result && result.error) throw tagCloudError(result.error, "debts");
+    if (result && result.error) throw tagCloudError(result.error, table);
   }
 
   // The one friendship DELETE. Every other group-table removal is a soft column the upsert
