@@ -1,5 +1,5 @@
 -- =====================================================================
--- push-notifications.sql -- Web Push via a server-side outbox (NOT YET APPLIED)
+-- push-notifications.sql -- Web Push via a server-side outbox (APPLIED 2026-10-05)
 --
 -- Plan: docs/superpowers/plans/2026-10-05-push-notifications.md, revised after the adversarial
 -- review in .superpowers/codex-plans-review.md (P1-P9). The shape:
