@@ -441,7 +441,9 @@
   .games-home-in { width: 100%; max-width: 380px; margin: 0 auto; }
   /* No big title on the dashboard: the column starts below the corner stack (theme + settings, ~86px)
      so the lead line and the quick actions never sit beside the gear. */
-  .games-home-dash { padding-top: 52px; }
+  .games-home-dash { padding-top: 4px; }
+  /* Same weight and size as the friends page's hero title, so the two tabs open the same way. */
+  .games-home-title { margin: 0 0 6px; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; text-align: center; }
   .games-home-lead { color: var(--dim); font-size: 14px; font-weight: 300; margin: 0 0 26px; }
   .games-section { margin-top: 24px; text-align: center; }
   .games-section:first-of-type { margin-top: 0; }
@@ -1275,7 +1277,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 82</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 83</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -6447,6 +6449,7 @@
     const box = document.getElementById("gamesHome");
     box.innerHTML = "";
     const inner = el("div", "games-home-in games-home-dash");
+    inner.appendChild(el("h2", "games-home-title", "השולחנות שלך"));
     inner.appendChild(el("p", "games-home-lead", "המשחקים הפעילים והקבוצות שלך במקום אחד."));
     renderQuickActions(inner);
     renderActiveGamesSection(inner, getActiveGameSummaries(state, state.groups), enterStagger);

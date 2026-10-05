@@ -427,15 +427,15 @@ test('the photographed suit artwork sits first in the safe-area-padded app shell
   assert.match(html, /:root\[data-theme="light"\] \.suits-mark-light \{ display: block; \}/);
 });
 
-test('renderGamesDashboard has no big title: the lead line is first and the column clears the corner stack', () => {
+test('renderGamesDashboard opens with a title like the friends page, then the lead line', () => {
+  // 2026-10-05: the owner asked for a heading here ("השולחנות שלך"), replacing the earlier
+  // no-title decision. Same size/weight as .friends-hero-title so both tabs open alike, and the
+  // padding puts it at the same height (measured: both tops at 98px on a 375x812 viewport).
   const source = sourceBetween('  function renderGamesDashboard() {', '  function renderGroupHeader(');
-  assert.doesNotMatch(source, /games-home-title/);
-  assert.doesNotMatch(source, /"h2"/);
   assert.match(source, /el\("div", "games-home-in games-home-dash"\)/);
-  assert.match(source, /inner\.appendChild\(el\("p", "games-home-lead", "המשחקים הפעילים והקבוצות שלך במקום אחד\."\)\);\s*renderQuickActions\(inner\);/);
-  assert.doesNotMatch(html, /\.games-home-title/);
-  // 52px: corner stack (theme 23px + 16px gap + gear 41px, from top 6px) ends at ~86px; the lead starts ~99px
-  assert.match(html, /\.games-home-dash \{ padding-top: 52px; \}/);
+  assert.match(source, /inner\.appendChild\(el\("h2", "games-home-title", "השולחנות שלך"\)\);\s*inner\.appendChild\(el\("p", "games-home-lead", "המשחקים הפעילים והקבוצות שלך במקום אחד\."\)\);\s*renderQuickActions\(inner\);/);
+  assert.match(html, /\.games-home-title \{[^}]*font-size: 20px; font-weight: 800;/);
+  assert.match(html, /\.games-home-dash \{ padding-top: 4px; \}/);
   assert.match(html, /\.games-home-lead \{[^}]*margin: 0 0 26px;/);
   // the group page reuses .games-home-in but not the dashboard padding
   const group = sourceBetween('  function renderGroupPage() {', '  function renderAddRowChips() {');
