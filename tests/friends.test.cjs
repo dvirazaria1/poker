@@ -239,7 +239,7 @@ test('when there is data, incoming and outgoing requests are rendered before the
   );
   const incomingIdx = populatedBranch.indexOf('renderFriendGroup(friendsSec, "בקשות שהתקבלו"');
   const outgoingIdx = populatedBranch.indexOf('renderFriendGroup(friendsSec, "בקשות שנשלחו"');
-  const friendsIdx = populatedBranch.indexOf('renderFriendGroup(friendsSec, "חברים"');
+  const friendsIdx = populatedBranch.indexOf('renderFriendGroup(friendsSec, onlyFriends ? "" : "חברים"');
   assert.ok(incomingIdx >= 0, 'incoming requests must render');
   assert.ok(outgoingIdx > incomingIdx, 'outgoing requests must follow incoming requests');
   assert.ok(friendsIdx > outgoingIdx, 'the friends list must follow both request groups, never lead them');
@@ -253,4 +253,10 @@ test('the share action is appended before the add-by-name action, keeping the pr
 
 test('the empty-state redesign changes presentation only -- no localStorage access inside renderFriendsPage', () => {
   assert.doesNotMatch(friendsPageSource, /localStorage\./);
+});
+
+test('a friends page with data has a title, skips empty groups, and lets the lists span the column', () => {
+  assert.match(friendsPageSource, /el\("h2", "friends-hero-title friends-page-title", "החברים שלך"\)/);
+  assert.match(html, /function renderFriendGroup\(parent, title, refs, metaLabel, actionsFor\) \{\n    if \(!refs\.length\) return;/);
+  assert.match(html, /\.friends-page \.debt-group \{ align-self: stretch; \}/);
 });

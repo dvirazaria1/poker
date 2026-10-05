@@ -756,6 +756,9 @@
      headline, one benefit line, then the share-link action as the page's one primary button. No
      new illustration — the app already reserves the suits mark for the header, not per-screen. */
   .friends-hero { align-self: stretch; text-align: center; }
+  /* .profile .psection centres its children; the lists must span the column like the debts pane. */
+  .friends-page .debt-group { align-self: stretch; }
+  .friends-page-title { margin-bottom: 4px; }
   .friends-hero-title { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
   .friends-hero-benefit { margin: 8px 0 0; color: var(--dim); font-size: 14px; font-weight: 300; }
   /* Section rhythm matches the dashboard's 24px; the secondary add-by-name path sits closer
@@ -1260,7 +1263,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 85</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 86</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -9058,8 +9061,9 @@
   // `actionsFor(index)` returns the row's buttons ([] for the accepted-friends list, which
   // carries nothing destructive by default).
   function renderFriendGroup(parent, title, refs, metaLabel, actionsFor) {
+    if (!refs.length) return; // an empty list says nothing its missing heading would not
     const group = el("div", "debt-group");
-    group.appendChild(el("h3", "", title));
+    if (title) group.appendChild(el("h3", "", title));
     refs.forEach((ref, i) => {
       const row = el("div", "debt-row");
       row.style.animationDelay = (i * 45) + "ms";
@@ -9156,6 +9160,7 @@
       hero.appendChild(el("p", "friends-hero-benefit", "חברים שמצטרפים דרך קישור זמינים מיד לבחירה בכל משחק וקבוצה."));
       friendsSec.appendChild(hero);
     } else {
+      friendsSec.appendChild(el("h2", "friends-hero-title friends-page-title", "החברים שלך"));
       renderFriendGroup(friendsSec, "בקשות שהתקבלו", friendData.incoming.map(f => f.requester), "ממתין לאישור שלך",
         online ? (i => {
           const id = friendData.incoming[i].id;
@@ -9169,7 +9174,9 @@
           const id = friendData.outgoing[i].id;
           return [{ label: "בטל", onClick: () => withdrawFriendRequest(id) }];
         }) : null);
-      renderFriendGroup(friendsSec, "חברים", friendData.friends, "");
+      // With no requests pending, the page title already says what this list is.
+      const onlyFriends = !friendData.incoming.length && !friendData.outgoing.length;
+      renderFriendGroup(friendsSec, onlyFriends ? "" : "חברים", friendData.friends, "");
     }
     // Primary path: share my personal link — the frictionless route, no lookup or typed name.
     // The reverse direction uses a stable server token, so it stays disabled until a signed-in
@@ -9226,7 +9233,10 @@
     const worst = games.length ? Math.min(...games.map(g => g.mine.net)) : 0;
     const openDebts = (state.debts || []).filter(debt => debt.status === "open");
     if (profileTab === "debts") markProfileDebtsSeenForUser(openDebts, me);
-    const hasNewProfileDebts = hasUnseenProfileDebt(openDebts, me, loadProfileDebtSeen(me));
+    // The dot on "חובות": a debt I have not looked at yet, or money owed to me that has not been
+    // marked paid -- the latter stays until it is, like the dot on "חייבים לי" inside.
+    const hasNewProfileDebts = hasUnseenProfileDebt(openDebts, me, loadProfileDebtSeen(me)) ||
+      openDebts.some(debt => debt.creditorName === me);
 
     // identity
     const idSec = el("section", "psection pid");
