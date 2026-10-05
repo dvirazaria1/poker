@@ -8774,7 +8774,7 @@
     // The reverse direction uses a stable server token, so it stays disabled until a signed-in
     // cloud session can create a redeemable link.
     if (me) {
-      const inviteMeBtn = el("button", "btn-primary friends-share-btn", friendInviteSharing ? "יוצר קישור…" : "שתפו קישור חברות");
+      const inviteMeBtn = el("button", "btn-primary friends-share-btn", friendInviteSharing ? "יוצר קישור…" : "צור קישור הזמנה");
       inviteMeBtn.type = "button";
       inviteMeBtn.disabled = !online || friendInviteSharing;
       if (online) inviteMeBtn.addEventListener("click", shareFriendInvite);
@@ -8783,7 +8783,7 @@
     }
     // Secondary path: look someone up by exact email or name — quieter, same shape as the
     // login screen's "המשך בלי חשבון": a real, bordered, 44px action, just not the lead one.
-    const addFriendBtn = el("button", "btn-quiet friends-add-toggle", "הוסף חבר");
+    const addFriendBtn = el("button", "btn-quiet friends-add-toggle", "חפש לפי שם או מייל");
     addFriendBtn.type = "button";
     addFriendBtn.disabled = !online;
     addFriendBtn.setAttribute("aria-disabled", online ? "false" : "true");

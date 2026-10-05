@@ -188,7 +188,7 @@ test('friends are a primary screen and are no longer rendered inside profile', (
   // Design round (row 22): the empty state states the fact, and the single shared SERVER_NOTE
   // constant under the disabled button carries the "needs a backend" wording for all five places.
   assert.match(html, /עוד אין חברים/);
-  assert.match(html, /"הוסף חבר"/);
+  assert.match(html, /"חפש לפי שם או מייל"/);
   // The button is live with a session and disabled without one; the shared note is what the
   // signed-out screen still shows (see tests/friend-requests.test.cjs for the wiring).
   assert.match(html, /addFriendBtn\.disabled = !online;/);
@@ -228,8 +228,8 @@ test('the empty state (no friends, no pending requests) renders a headline, a be
   assert.match(emptyBranch, /el\("p", "friends-hero-benefit",/);
   // the share-link action is the page's real .btn-primary; add-by-name is the quieter .btn-quiet
   // secondary (same weighting the login screen already uses for its lead vs. skip action).
-  assert.match(friendsPageSource, /el\("button", "btn-primary friends-share-btn", friendInviteSharing \? "יוצר קישור…" : "שתפו קישור חברות"\)/);
-  assert.match(friendsPageSource, /el\("button", "btn-quiet friends-add-toggle", "הוסף חבר"\)/);
+  assert.match(friendsPageSource, /el\("button", "btn-primary friends-share-btn", friendInviteSharing \? "יוצר קישור…" : "צור קישור הזמנה"\)/);
+  assert.match(friendsPageSource, /el\("button", "btn-quiet friends-add-toggle", "חפש לפי שם או מייל"\)/);
 });
 
 test('when there is data, incoming and outgoing requests are rendered before the accepted-friends list', () => {
