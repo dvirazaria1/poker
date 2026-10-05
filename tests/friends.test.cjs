@@ -228,7 +228,7 @@ test('the empty state (no friends, no pending requests) renders a headline, a be
   assert.match(emptyBranch, /el\("p", "friends-hero-benefit",/);
   // the share-link action is the page's real .btn-primary; add-by-name is the quieter .btn-quiet
   // secondary (same weighting the login screen already uses for its lead vs. skip action).
-  assert.match(friendsPageSource, /el\("button", "btn-primary friends-share-btn", friendInviteSharing \? "יוצר קישור…" : "צור קישור הזמנה"\)/);
+  assert.match(friendsPageSource, /el\("button", "btn-primary friends-share-btn", friendInviteSharing \? "יוצר קישור…"\s+: \(friendInviteLinkCache[^;]*"שתף את קישור ההזמנה" : "צור קישור הזמנה"\)\)/);
   assert.match(friendsPageSource, /el\("button", "btn-quiet friends-add-toggle", "חפש לפי שם או מייל"\)/);
 });
 

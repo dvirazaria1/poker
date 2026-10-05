@@ -1275,7 +1275,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 81</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 82</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -8926,6 +8926,10 @@
 
   let friendInviteSharing = false;
   let friendInviteShareError = "";
+  // The personal link is stable per profile, so it is remembered for the session: the first tap
+  // has to wait for the server, and iOS refuses a share sheet that opens after an await. The
+  // next tap then shares straight from the gesture.
+  let friendInviteLinkCache = null; // { userId, link }
 
   // A personal token can only be useful when a signed-in server owns it. Do
   // not manufacture a local fallback: an offline link would be dead on arrival.
@@ -8933,6 +8937,10 @@
     if (!supabase) return;
     if (!cloudMode() || friendInviteSharing) return;
     const sessionUserId = authUser && authUser.id;
+    if (friendInviteLinkCache && friendInviteLinkCache.userId === sessionUserId) {
+      openFriendShare(friendInviteLinkCache.link);
+      return;
+    }
     friendInviteSharing = true;
     friendInviteShareError = "";
     renderFriendsPage();
@@ -8944,17 +8952,30 @@
       const token = row && normalizeFriendToken(row.token);
       if (!token) throw new Error("bad friend invite token");
       const link = friendInviteLink(token, location.origin, location.pathname);
-      const message = buildFriendShareText(me, link);
-      if (typeof navigator.share === "function") {
-        navigator.share({ title: "סוגרים קופה", text: message }).catch(() => {});
-      } else {
-        window.open("https://wa.me/?text=" + encodeURIComponent(message), "_blank", "noopener");
-      }
+      friendInviteLinkCache = { userId: sessionUserId, link };
+      openFriendShare(link);
     } catch (e) {
-      friendInviteShareError = "לא הצלחנו ליצור קישור לחברים, נסו שוב";
+      console.warn("friend invite failed:", e);
+      const code = e && (e.code || e.status) ? " (" + (e.code || e.status) + ")" : "";
+      friendInviteShareError = "לא הצלחנו ליצור קישור לחברים, נסו שוב" + code;
     } finally {
       friendInviteSharing = false;
       if (cloudMode() && authUser && authUser.id === sessionUserId) renderFriendsPage();
+    }
+  }
+
+  function openFriendShare(link) {
+    const message = buildFriendShareText(me, link);
+    if (typeof navigator.share === "function") {
+      navigator.share({ title: "סוגרים קופה", text: message }).catch(err => {
+        if (err && err.name === "AbortError") return; // the person closed the sheet
+        // Refused for lack of a fresh tap (the first share waited for the server): the link is
+        // cached now, so the button turns into a one-tap share.
+        friendInviteShareError = "";
+        renderFriendsPage();
+      });
+    } else {
+      window.open("https://wa.me/?text=" + encodeURIComponent(message), "_blank", "noopener");
     }
   }
 
@@ -9102,7 +9123,8 @@
     // The reverse direction uses a stable server token, so it stays disabled until a signed-in
     // cloud session can create a redeemable link.
     if (me) {
-      const inviteMeBtn = el("button", "btn-primary friends-share-btn", friendInviteSharing ? "יוצר קישור…" : "צור קישור הזמנה");
+      const inviteMeBtn = el("button", "btn-primary friends-share-btn", friendInviteSharing ? "יוצר קישור…"
+        : (friendInviteLinkCache && authUser && friendInviteLinkCache.userId === authUser.id ? "שתף את קישור ההזמנה" : "צור קישור הזמנה"));
       inviteMeBtn.type = "button";
       inviteMeBtn.disabled = !online || friendInviteSharing;
       if (online) inviteMeBtn.addEventListener("click", shareFriendInvite);
