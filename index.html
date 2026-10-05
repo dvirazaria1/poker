@@ -1253,6 +1253,10 @@
       <button type="button" class="switch" id="setThemeSwitch" role="switch" aria-label="החלף בין מצב כהה למצב בהיר"></button>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13.5A8 8 0 0 1 10.5 4a8 8 0 1 0 9.5 9.5Z"></path></svg>
     </div>
+    <div id="setProfileFail" hidden>
+      <p class="games-primary-reason">ההתחברות הצליחה אבל לא הצלחנו לטעון את החשבון.</p>
+      <button type="button" class="set-flat" id="setProfileRetryBtn">נסו שוב</button>
+    </div>
     <p class="games-primary-reason" id="setSignInNote" hidden>המשחקים שלך נשמרים רק במכשיר הזה.</p>
     <button type="button" class="set-flat" id="setSignInBtn" hidden>התחבר עם חשבון</button>
     <button type="button" class="set-flat" id="setSwapBtn">התנתקות</button>
@@ -1271,7 +1275,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 79</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 80</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -1329,6 +1333,10 @@
         <span id="authGoogleLabel">המשך עם Google</span>
       </button>
       <p class="auth-error" id="authGoogleError" hidden></p>
+      <div class="auth-profile-fail" id="authProfileFail" hidden>
+        <p class="auth-error">ההתחברות הצליחה אבל לא הצלחנו לטעון את החשבון.</p>
+        <button type="button" class="btn-skip" id="authProfileRetryBtn">נסו שוב</button>
+      </div>
       <div class="auth-divider"><span>או</span></div>
       <div class="auth-step" id="authEmailStep">
         <input type="email" id="authEmail" dir="ltr" inputmode="email" autocomplete="email" placeholder="name@mail.com" aria-label="כתובת מייל">
@@ -8133,6 +8141,8 @@
       return "אין חיבור לאינטרנט. נסו שוב.";
     }
     if (status === 429 || /rate limit|too many|429/.test(message)) {
+      // Sending a code is capped for the whole project, not per person — never promise "a few minutes".
+      if (step === "email") return "מכסת שליחת המיילים אזלה כרגע. אפשר להתחבר עם Google.";
       return "יותר מדי ניסיונות. נסו שוב בעוד כמה דקות.";
     }
     if (step === "code") {
@@ -8151,7 +8161,12 @@
   // data moves to the server yet — save()/initSync()/remoteBody() are untouched, and nothing here
   // invents a `userId` on a participant ref (that is phase 2).
   let authUser = null;          // null | { id, email, displayName, app_metadata, identities }
-  let authAppliedUserId = null; // last session already turned into a profile — avoids double upserts
+  let authAppliedUserId = null; // last session whose profile was ensured (set only after success) — avoids double upserts
+  let authPendingUserId = null; // session whose profile request is in flight — same-user events wait for it
+  let authProfileFailedUserId = null; // session whose profile could not be ensured; shows the retry line
+  let authSessionGen = 0;       // bumped on every identity transition and sign-out; stale profile work is dropped
+  let authGoogleBusy = false;   // the OAuth redirect was started and we have not been navigated away yet
+  let authResendBusy = false;   // a resend request is in flight
   let authEmailPending = "";    // address a code was sent to; "" while the email step is showing
   let authRedirectError = "";   // an error the OAuth redirect came back with, shown on the login screen
   let authAutoVerifyTimer = null; // ~250ms after the 6th digit, verifies without waiting for "אישור"
@@ -8176,18 +8191,29 @@
     return "שחקן";
   }
 
+  // Returns the profile, or null when it could not be ensured (read failed, or the row is missing
+  // and could not be created). An existing row survives a failed update; a failed read never
+  // falls through to an upsert, which would overwrite the stored name with a local fallback.
   async function ensureProfile(user) {
     if (!supabase || !user) return null;
     let existingName = "";
+    let rowExists = false;
     try {
-      const { data } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
+      const { data, error } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
+      if (error) return null;
+      rowExists = !!data;
       existingName = (data && data.display_name) || "";
-    } catch (e) {}
+    } catch (e) { return null; }
     const displayName = preferredDisplayName(user, existingName);
     // Exactly the profiles columns this user is allowed to write (profiles_insert_self /
     // profiles_update_self): the row id must equal the auth user id.
     const row = { id: user.id, display_name: displayName, email: user.email || null };
-    try { await supabase.from("profiles").upsert(row, { onConflict: "id" }); } catch (e) {}
+    let upsertFailed = false;
+    try {
+      const { error } = await supabase.from("profiles").upsert(row, { onConflict: "id" });
+      upsertFailed = !!error;
+    } catch (e) { upsertFailed = true; }
+    if (upsertFailed && !rowExists) return null;
     return { id: user.id, email: user.email || "", displayName };
   }
 
@@ -8207,39 +8233,103 @@
   async function applySession(session) {
     const user = session && session.user;
     if (!user) {
-      if (!authUser && authAppliedUserId === null) return; // no session before, no session now
+      authSessionGen++; // any profile request still in flight belongs to a session that is gone
+      authPendingUserId = null;
+      authProfileFailedUserId = null;
+      renderAuthProfileState();
+      if (!authUser && authAppliedUserId === null) { // no session before, no session now
+        refreshInviteNotices(); // a fresh invite visitor still needs the join / sign-in action
+        return;
+      }
       authUser = null;
       authAppliedUserId = null;
       exitCloudMode(); // local records stay put; we simply stop pushing them
       render(); // `me` deliberately stays: local play continues after a sign-out
+      refreshInviteNotices();
       return;
     }
     if (authAppliedUserId === user.id) return; // token refresh / repeated event — nothing to do
-    authAppliedUserId = user.id;
+    if (authPendingUserId === user.id) return; // its profile request is already running
+    if (authUser && authUser.id !== user.id) { // another account took over: stop acting as the old one
+      authUser = null;
+      authAppliedUserId = null;
+      exitCloudMode();
+    }
+    const gen = ++authSessionGen;
+    authPendingUserId = user.id;
     const profile = await ensureProfile(user);
-    authUser = profile || { id: user.id, email: user.email || "", displayName: me || "" };
+    if (gen !== authSessionGen) return; // signed out or switched account while we waited
+    authPendingUserId = null;
+    if (!profile) { // authenticated but no usable profile: stay out of cloud mode until a retry works
+      const firstFailure = authProfileFailedUserId !== user.id;
+      authProfileFailedUserId = user.id;
+      renderAuthProfileState();
+      if (firstFailure) showLogin();
+      return;
+    }
+    authProfileFailedUserId = null;
+    authAppliedUserId = user.id;
+    authUser = profile;
     // Read-only passthrough of the provider fields so the settings contact block can lock itself
     // for Google-linked accounts (isGoogleAccount). Nothing in auth reads these back.
     Object.assign(authUser, { app_metadata: user.app_metadata || null, identities: user.identities || null });
     if (authUser.displayName && authUser.displayName !== me) { me = authUser.displayName; saveMe(); }
     stripAuthParamsFromUrl();
     document.getElementById("login").hidden = true;
+    renderAuthProfileState();
     render();
     enterCloudMode(); // phase 2a: groups/members/invites/friendships now live on the server
     maybeRunPendingJoin(); // an invite link opened before signing in redeems itself now, once
     maybeRunPendingFriendInvite();
   }
 
+  // getSession's error: a confirmed dead session clears the app identity; a network failure keeps
+  // everything (the SDK retries the refresh itself and local play carries on).
+  function isInvalidSessionError(error) {
+    if (!error) return false;
+    const status = error.status;
+    const text = String((error.code || "") + " " + (error.message || "")).toLowerCase();
+    if (status === 0 || /network|fetch|offline|timeout/.test(text)) return false;
+    return status === 400 || status === 401 || status === 403 ||
+      /refresh_token|invalid.*(token|jwt|session)|session.*(missing|not found|expired)/.test(text);
+  }
+
   function initAuth() {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => applySession(data && data.session)).catch(() => {});
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) { if (isInvalidSessionError(error)) applySession(null); return; }
+      return applySession(data && data.session);
+    }).catch(() => {});
     supabase.auth.onAuthStateChange((event, session) => { applySession(session); });
   }
 
+  // Profile-failure line: on the login screen and in settings, both with a retry. A retry re-reads
+  // the SDK session, so a session that died meanwhile simply clears the state.
+  function renderAuthProfileState() {
+    const failed = !!authProfileFailedUserId;
+    const box = document.getElementById("authProfileFail");
+    if (box) box.hidden = !failed;
+    const note = document.getElementById("setProfileFail");
+    if (note) note.hidden = !failed;
+  }
+  async function retryAuthProfile() {
+    if (!supabase || authPendingUserId) return;
+    ["authProfileRetryBtn", "setProfileRetryBtn"].forEach(id => setAuthBusy(id, true, "מנסה…", "נסו שוב"));
+    try {
+      const { data } = await supabase.auth.getSession();
+      await applySession(data && data.session);
+    } catch (e) {}
+    ["authProfileRetryBtn", "setProfileRetryBtn"].forEach(id => setAuthBusy(id, false, "מנסה…", "נסו שוב"));
+  }
+
   function signOutAccount() {
-    if (!supabase || !authUser) return;
+    if (!supabase) return;
+    if (!authUser && !authPendingUserId && !authProfileFailedUserId) return; // local mode: nothing to end
+    authSessionGen++; // drops a profile request that is still waiting
     authUser = null;
     authAppliedUserId = null;
+    authPendingUserId = null;
+    authProfileFailedUserId = null;
     exitCloudMode(); // applySession(null) short-circuits after this, so stop the pushes here
     supabase.auth.signOut().catch(() => {});
   }
@@ -8303,7 +8393,7 @@
     const remaining = Math.max(0, Math.ceil((authResendUntil - Date.now()) / 1000));
     if (remaining <= 0) {
       clearResendCountdown();
-      btn.disabled = false;
+      btn.disabled = authResendBusy;
       btn.textContent = "שליחה חוזרה";
     } else {
       btn.disabled = true;
@@ -8327,6 +8417,7 @@
     if (!supabase) return;
     setAuthError("authGoogleError", "");
     setGoogleBusy(true);
+    authGoogleBusy = true;
     try {
       // location.search is included so a `?join=` / `?friend=` invite token opened before sign-in
       // survives the OAuth redirect round trip (Google returns to this same URL, then supabase-js
@@ -8337,10 +8428,20 @@
       });
       if (error) throw error;
     } catch (e) {
+      authGoogleBusy = false;
       setGoogleBusy(false);
       setAuthError("authGoogleError", mapAuthError(e, "google"));
     }
   }
+  // Coming back to the page (bfcache, or a PWA that handed the redirect to another browser) means
+  // the navigation did not take over this document: the button must not stay stuck on "מעביר…".
+  function resetGoogleBusy() {
+    if (!authGoogleBusy) return;
+    authGoogleBusy = false;
+    setGoogleBusy(false);
+  }
+  window.addEventListener("pageshow", resetGoogleBusy);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) resetGoogleBusy(); });
 
   async function sendEmailCode() {
     if (!supabase) return;
@@ -8368,15 +8469,20 @@
   }
 
   async function resendEmailCode() {
-    if (!supabase || !authEmailPending) return;
+    if (!supabase || !authEmailPending || authResendBusy) return;
+    authResendBusy = true; // one request at a time: a double tap must not burn the project's email quota
+    document.getElementById("authResendBtn").disabled = true;
     setAuthError("authCodeError", "");
     try {
       const { error } = await supabase.auth.signInWithOtp({ email: authEmailPending, options: { shouldCreateUser: true } });
       if (error) throw error;
+      authResendBusy = false;
       startResendCountdown();
     } catch (e) {
       setAuthError("authCodeError", mapAuthError(e, "email"));
     }
+    authResendBusy = false;
+    tickResendButton();
   }
 
   async function verifyEmailCode() {
@@ -8419,6 +8525,8 @@
     if (digits.length === 6) authAutoVerifyTimer = setTimeout(verifyEmailCode, 250);
   });
   document.getElementById("authResendBtn").addEventListener("click", resendEmailCode);
+  document.getElementById("authProfileRetryBtn").addEventListener("click", retryAuthProfile);
+  document.getElementById("setProfileRetryBtn").addEventListener("click", retryAuthProfile);
   document.getElementById("authCodeBackBtn").addEventListener("click", () => {
     authEmailPending = "";
     clearResendCountdown();
@@ -8445,6 +8553,7 @@
     authRedirectError = ""; // shown once — a later visit to this screen starts clean
     setAuthError("authEmailError", "");
     setAuthError("authCodeError", "");
+    renderAuthProfileState();
     const note = document.getElementById("loginNote");
     note.textContent = loginNote;
     note.hidden = !loginNote;
@@ -8791,7 +8900,7 @@
     // The reverse direction uses a stable server token, so it stays disabled until a signed-in
     // cloud session can create a redeemable link.
     if (me) {
-      const inviteMeBtn = el("button", "btn-primary friends-share-btn", friendInviteSharing ? "יוצר קישור…" : "שתפו קישור חברות");
+      const inviteMeBtn = el("button", "btn-primary friends-share-btn", friendInviteSharing ? "יוצר קישור…" : "צור קישור הזמנה");
       inviteMeBtn.type = "button";
       inviteMeBtn.disabled = !online || friendInviteSharing;
       if (online) inviteMeBtn.addEventListener("click", shareFriendInvite);
@@ -8800,7 +8909,7 @@
     }
     // Secondary path: look someone up by exact email or name — quieter, same shape as the
     // login screen's "המשך בלי חשבון": a real, bordered, 44px action, just not the lead one.
-    const addFriendBtn = el("button", "btn-quiet friends-add-toggle", "הוסף חבר");
+    const addFriendBtn = el("button", "btn-quiet friends-add-toggle", "חפש לפי שם או מייל");
     addFriendBtn.type = "button";
     addFriendBtn.disabled = !online;
     addFriendBtn.setAttribute("aria-disabled", online ? "false" : "true");
@@ -9247,6 +9356,7 @@
     document.getElementById("setSignInNote").hidden = !canSignIn;
     document.getElementById("setSignInBtn").hidden = !canSignIn;
     document.getElementById("setSwapBtn").hidden = !authUser;
+    renderAuthProfileState();
     document.getElementById("setSwapBtn").textContent = "התנתקות";
     // Danger zone: account deletion only makes sense for a signed-in account.
     document.getElementById("setDangerTitle").hidden = !authUser;
@@ -9648,7 +9758,10 @@
       });
       ui.continueBtn.addEventListener("click", () => {
         const wasSignedOut = !me;
-        closeJoinNotice();
+        // No backend yet: just put the notice away. The token (and ?join=) must outlive it, so the
+        // invite is still there to redeem once the client loads and the person signs in.
+        if (!supabase) joinNoticeParts().notice.hidden = true;
+        else closeJoinNotice();
         if (wasSignedOut) showLogin();
       });
       // "לא עכשיו" dismisses without pushing the login screen — the app is usable without a name.
@@ -9658,6 +9771,13 @@
     pendingJoinToken = token;
     ui.notice.hidden = false;
     if (autoRun && cloudMode()) runJoin(token);
+  }
+
+  // Backend readiness or the auth state changed: an invite notice that is on screen re-decides what
+  // to offer (join / sign in / unavailable). A notice the person already put away stays away.
+  function refreshInviteNotices() {
+    if (pendingFriendToken && !friendNoticeRedeeming && !friendNoticeParts().notice.hidden) showFriendNotice(pendingFriendToken);
+    if (pendingJoinToken && !joinRedeemRunning && !joinNoticeParts().notice.hidden) showJoinNotice(pendingJoinToken, false);
   }
 
   // Called from applySession() right after a session lands. One attempt: if the token is gone or
@@ -9941,9 +10061,35 @@
     if (!supabase) supabase = createBackendClient();
     refreshAuthBlock();
     initAuth();
+    refreshInviteNotices(); // the SDK is here now: drop the "no server" notice for a real action
   }
   if (supabase) bootBackend();
   else document.addEventListener("DOMContentLoaded", bootBackend, { once: true });
+  // The SDK init above is one-shot: a CDN that was blocked/offline at load left supabase null until
+  // a manual reload. Retry on `online` and on returning to the page; if the UMD script never
+  // executed, inject it again, then build the client and run the same bootBackend path so session
+  // restore and login work without a reload. Idempotent (no-op once a client exists) and at most
+  // one script request in flight. Local play never depends on any of it.
+  let sdkRetryInFlight = false;
+  function retryBackendSdk() {
+    if (supabase || sdkRetryInFlight) return;
+    if (document.readyState === "loading") return; // the DOMContentLoaded boot above still owns this
+    if (navigator.onLine === false) return;
+    if (window.supabase && typeof window.supabase.createClient === "function") {
+      supabase = createBackendClient();
+      if (supabase) bootBackend();
+      return;
+    }
+    sdkRetryInFlight = true;
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+    const done = () => { sdkRetryInFlight = false; s.remove(); };
+    s.onload = () => { done(); retryBackendSdk(); };
+    s.onerror = done;
+    document.head.appendChild(s);
+  }
+  window.addEventListener("online", retryBackendSdk);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") retryBackendSdk(); });
   // After the auth section, so initSync() can ask cloudMode() whether a session already owns the
   // data. A restored session arrives asynchronously and tears this down again (enterCloudMode).
   initSync();
@@ -9953,7 +10099,11 @@
   // server round trip) — before falling back to the group join flow, then the login screen.
   const friendToken = parseFriendToken(location.search);
   const joinToken = parseJoinToken(location.search);
-  if (friendToken) {
+  if (authRedirectError) {
+    // The OAuth round trip failed: say so even when this device already has a name. Invite
+    // tokens stay pending (they are re-read from the URL after sign-in) — only the notice yields.
+    showLogin();
+  } else if (friendToken) {
     showFriendNotice(friendToken);
   } else if (joinToken) {
     // The notice decides for itself what it can offer (join / sign in / nothing yet) and keeps
@@ -9966,7 +10116,14 @@
 </script>
 <script>
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+  addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").then((reg) => {
+      // Re-check for a new worker whenever the installed app returns to the foreground.
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") reg.update().catch(() => {});
+      });
+    }).catch((err) => console.warn("service worker registration failed", err));
+  });
 }
 </script>
 </body>
