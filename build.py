@@ -29,7 +29,14 @@ HEAD = """<!doctype html>
 
 TAIL = """<script>
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+  addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").then((reg) => {
+      // Re-check for a new worker whenever the installed app returns to the foreground.
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") reg.update().catch(() => {});
+      });
+    }).catch((err) => console.warn("service worker registration failed", err));
+  });
 }
 </script>
 </body>

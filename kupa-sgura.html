@@ -9927,6 +9927,31 @@
   }
   if (supabase) bootBackend();
   else document.addEventListener("DOMContentLoaded", bootBackend, { once: true });
+  // The SDK init above is one-shot: a CDN that was blocked/offline at load left supabase null until
+  // a manual reload. Retry on `online` and on returning to the page; if the UMD script never
+  // executed, inject it again, then build the client and run the same bootBackend path so session
+  // restore and login work without a reload. Idempotent (no-op once a client exists) and at most
+  // one script request in flight. Local play never depends on any of it.
+  let sdkRetryInFlight = false;
+  function retryBackendSdk() {
+    if (supabase || sdkRetryInFlight) return;
+    if (document.readyState === "loading") return; // the DOMContentLoaded boot above still owns this
+    if (navigator.onLine === false) return;
+    if (window.supabase && typeof window.supabase.createClient === "function") {
+      supabase = createBackendClient();
+      if (supabase) bootBackend();
+      return;
+    }
+    sdkRetryInFlight = true;
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+    const done = () => { sdkRetryInFlight = false; s.remove(); };
+    s.onload = () => { done(); retryBackendSdk(); };
+    s.onerror = done;
+    document.head.appendChild(s);
+  }
+  window.addEventListener("online", retryBackendSdk);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") retryBackendSdk(); });
   // After the auth section, so initSync() can ask cloudMode() whether a session already owns the
   // data. A restored session arrives asynchronously and tears this down again (enterCloudMode).
   initSync();

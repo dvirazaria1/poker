@@ -19,15 +19,38 @@ const PRECACHE_URLS = [
 // they're safe to serve cache-first; everything else in PRECACHE_URLS is a page and stays network-first.
 const STATIC_ASSETS = new Set(["manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"]);
 
+// Without these two entries the worker has no offline shell at all, so an install that could not
+// store them must FAIL (the previous worker and its complete cache keep serving) instead of
+// activating and deleting the old cache. Everything else in PRECACHE_URLS is best-effort.
+const CRITICAL_URLS = ["./", "index.html"];
+
+// How long a network-first navigation may hang before the cached shell is served instead. When the
+// network answers in time it still wins, so a fresh deploy lands as before.
+const NAV_TIMEOUT_MS = 4000;
+
+// Only a real, same-origin 200-class response is worth keeping: a 404/500 page or an opaque/cors
+// response cached here would be served back as the "app" next time the network is down.
+function cacheable(res) {
+  return !!res && res.ok && res.type === "basic";
+}
+
 self.addEventListener("install", (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) =>
+    caches.open(CACHE).then((c) => {
       // addAll() is all-or-nothing: one missing/404 entry aborts the whole install and leaves the
-      // app with zero offline cache. Add each entry independently so a single miss stays a single miss.
-      Promise.allSettled(PRECACHE_URLS.map((url) => c.add(url)))
-    )
+      // app with zero offline cache. Add each entry independently so a single miss stays a single miss —
+      // but c.add() itself would accept a 404, so fetch and validate each response first.
+      const add = (url) =>
+        fetch(url).then((res) => {
+          if (!cacheable(res)) throw new Error("precache failed: " + url + " (" + res.status + ")");
+          return c.put(url, res);
+        });
+      return Promise.allSettled(PRECACHE_URLS.map(add)).then((results) => {
+        const critical = results.filter((r, i) => CRITICAL_URLS.includes(PRECACHE_URLS[i]));
+        if (critical.some((r) => r.status !== "fulfilled")) throw new Error("critical app shell failed to precache");
+      });
+    }).then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener("activate", (e) => {
@@ -50,31 +73,39 @@ self.addEventListener("fetch", (e) => {
   if (url.origin !== self.location.origin) return;
 
   const isStaticAsset = STATIC_ASSETS.has(url.pathname.replace(/^\//, ""));
+  // Runtime cache writes are tied to the event lifetime so the worker isn't terminated mid-write.
+  const store = (res) => {
+    if (!cacheable(res)) return;
+    const clone = res.clone();
+    e.waitUntil(caches.open(CACHE).then((c) => c.put(e.request, clone)).catch(() => {}));
+  };
+
   if (isStaticAsset) {
     // Cache-first with a background refresh: instant response, cache quietly updated for next time.
-    e.respondWith(
-      caches.match(e.request).then((cached) => {
-        const network = fetch(e.request)
-          .then((res) => {
-            caches.open(CACHE).then((c) => c.put(e.request, res.clone()));
-            return res;
-          })
-          .catch(() => cached);
-        return cached || network;
-      })
-    );
+    const network = fetch(e.request)
+      .then((res) => { store(res); return res; })
+      .catch(() => caches.match(e.request));
+    // The refresh keeps running after a cache hit, so keep the worker alive until it settles.
+    e.waitUntil(network.catch(() => {}));
+    e.respondWith(caches.match(e.request).then((cached) => cached || network));
     return;
   }
 
   // Network-first for pages/navigations (so updates land as soon as they're deployed — deliberate),
   // with a cache fallback offline; "./" is the last-resort shell if this exact request was never cached.
+  // The network gets NAV_TIMEOUT_MS: a hanging connection (captive portal, dead wifi) would otherwise
+  // never reach the fallback. A late answer is still cached for next time.
+  const fallback = () => caches.match(e.request).then((r) => r || caches.match("./"));
+  const network = fetch(e.request).then((res) => {
+    store(res);
+    // A server error (5xx) isn't a page to show if we hold a good cached one; a 404 passes through as-is.
+    return res.status >= 500 ? fallback().then((r) => r || res) : res;
+  });
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), NAV_TIMEOUT_MS));
+  e.waitUntil(network.catch(() => {}));
   e.respondWith(
-    fetch(e.request)
-      .then((res) => {
-        const clone = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, clone));
-        return res;
-      })
-      .catch(() => caches.match(e.request).then((r) => r || caches.match("./")))
+    Promise.race([network, timeout])
+      .then((res) => res || fallback().then((r) => r || network))
+      .catch(fallback)
   );
 });
