@@ -37,7 +37,12 @@ test('mapAuthError: network failure reads as a connectivity problem, in Hebrew',
 });
 
 test('mapAuthError: a 429 / rate-limit reads as "too many attempts", not a generic failure', () => {
-  assert.match(mapAuthError({ status: 429, message: 'Too many requests' }, 'email'), /יותר מדי/);
+  assert.match(mapAuthError({ status: 429, message: 'Too many requests' }, 'code'), /יותר מדי/);
+  // Sending a code is capped project-wide: say the quota is spent and point at Google, no "few minutes".
+  const send = mapAuthError({ status: 429, message: 'Too many requests' }, 'email');
+  assert.match(send, /מכסת/);
+  assert.match(send, /Google/);
+  assert.doesNotMatch(send, /דקות/);
 });
 
 test('mapAuthError: wrong or expired code are distinguished, both short and in Hebrew', () => {
