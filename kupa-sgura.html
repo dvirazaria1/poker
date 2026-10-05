@@ -1254,7 +1254,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 77</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 78</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -2270,17 +2270,21 @@
             if (split.inserts.length) {
               const result = await supabase.from(pair[1]).upsert(split.inserts, { onConflict: "id", ignoreDuplicates: true });
               if (!pushIsCurrent()) return;
-              if (result && result.error) throw tagCloudError(result.error, pair[1]);
+              if (result && result.error) throw await cloudNameRefusedRow(result.error, pair[1], split.inserts);
               // DO NOTHING reports success both when it inserted and when the row was already on
               // the server. Do not promote either case into the local baseline until a pull
               // resolves it; otherwise an unseen server row would swallow this local edit forever.
               split.inserts.forEach(row => unknownInsertIds.add(String(row.id)));
               noteCloudInsertReconcile(pushAccountId, pair[0], split.inserts);
             }
-            if (split.updates.length) {
-              const result = await supabase.from(pair[1]).upsert(split.updates, { onConflict: "id" });
+            // A row the server already holds is changed with a plain UPDATE, never an upsert:
+            // PostgreSQL checks INSERT ... ON CONFLICT DO UPDATE against the INSERT policy too,
+            // even when the row exists, and games_insert_member forbids phase 'closed' -- so every
+            // close was refused, as was any edit to a row someone else created.
+            for (const row of split.updates) {
+              const result = await supabase.from(pair[1]).update(cloudUpdateFields(row)).eq("id", row.id);
               if (!pushIsCurrent()) return;
-              if (result && result.error) throw tagCloudError(result.error, pair[1]);
+              if (result && result.error) throw tagCloudError(result.error, pair[1], row);
             }
           }
         }
@@ -2359,6 +2363,20 @@
     const result = await supabase.from(table).delete().in("id", ids);
     if (!authUser || authUser.id !== deleteAccountId) return;
     if (result && result.error) throw tagCloudError(result.error, table);
+  }
+
+  // A batch INSERT fails as a whole and the server does not say which row it refused. Resend the
+  // rows one at a time (DO NOTHING, so the ones that pass are simply stored) until the refused one
+  // answers, and name it on the error the sync dot shows.
+  async function cloudNameRefusedRow(error, table, rows) {
+    tagCloudError(error, table);
+    if (!supabase) return error;
+    if (!rows || rows.length < 2 || classifyCloudError(error) !== "surface") return error;
+    for (const row of rows) {
+      const result = await supabase.from(table).upsert([row], { onConflict: "id", ignoreDuplicates: true });
+      if (result && result.error) return tagCloudError(result.error, table, row);
+    }
+    return error;
   }
 
   // The one friendship DELETE. Every other group-table removal is a soft column the upsert
@@ -5243,9 +5261,18 @@
   // A refused write used to surface as "שגיאת שמירה" and nothing else -- neither the person
   // holding the phone nor anyone reading a bug report could tell WHICH table the server refused
   // or why, which is exactly the information needed to fix it. Carry it through.
-  function tagCloudError(error, table) {
+  function tagCloudError(error, table, row) {
     if (error && typeof error === "object" && !error.cloudTable) error.cloudTable = table;
+    if (error && typeof error === "object" && row && !error.cloudRow) error.cloudRow = row;
     return error;
+  }
+  // Columns that never change after a row is created. Leaving them out of an UPDATE means a
+  // device with a stale or reconstructed creator can never rewrite who made the row.
+  const CLOUD_IMMUTABLE_COLUMNS = { id: true, created_by: true, created_by_profile_id: true, created_at: true };
+  function cloudUpdateFields(row) {
+    const out = {};
+    Object.keys(row || {}).forEach(key => { if (!CLOUD_IMMUTABLE_COLUMNS[key]) out[key] = row[key]; });
+    return out;
   }
   function describeCloudError(error) {
     if (!error) return null;
@@ -5253,11 +5280,23 @@
     const code = error.code || (error.status ? String(error.status) : "");
     const message = String(error.message || "").slice(0, 120);
     if (!table && !code && !message) return null;
-    return { table, code, message };
+    return { table, code, message, row: describeCloudRow(error.cloudRow) };
+  }
+  // Enough to find the refused row in the database, nothing personal: a short id and the
+  // columns the write policies actually test.
+  function describeCloudRow(row) {
+    if (!row || typeof row !== "object") return "";
+    const me = typeof authUser !== "undefined" && authUser ? authUser.id : null;
+    const creator = row.created_by || row.created_by_profile_id || "";
+    return ["row " + String(row.id || "").slice(0, 8),
+      row.phase || row.status || "",
+      row.group_id ? "group " + String(row.group_id).slice(0, 8) : "",
+      creator ? (creator === me ? "mine" : "creator " + String(creator).slice(0, 8)) : ""].filter(Boolean).join(" ");
   }
   function cloudErrorDetail(info) {
     if (!info) return "";
-    return [info.table, info.code].filter(Boolean).join(" ") + (info.message ? ": " + info.message : "");
+    return [info.table, info.code].filter(Boolean).join(" ") + (info.message ? ": " + info.message : "") +
+      (info.row ? "\n" + info.row : "");
   }
 
   function classifyCloudError(error) {

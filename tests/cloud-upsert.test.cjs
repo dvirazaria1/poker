@@ -139,8 +139,13 @@ test('the games branch no longer merge-upserts a row the server may not hold', (
     'the push must split its rows into inserts and updates');
   assert.ok(storeSource.includes('.upsert(split.inserts, { onConflict: "id", ignoreDuplicates: true })'),
     'new rows must go up as INSERT ... ON CONFLICT DO NOTHING');
-  assert.ok(storeSource.includes('.upsert(split.updates, { onConflict: "id" })'),
-    'known rows keep the merge upsert');
+  // Known rows are a plain UPDATE: ON CONFLICT DO UPDATE is checked against the INSERT policy
+  // as well (PostgreSQL docs, CREATE POLICY), and games_insert_member forbids phase 'closed', so
+  // the merge upsert refused every close -- seen live as "games 42501" on 2026-10-05.
+  assert.ok(storeSource.includes('.update(cloudUpdateFields(row)).eq("id", row.id)'),
+    'known rows must be a plain UPDATE');
+  assert.ok(!storeSource.includes('.upsert(split.updates'),
+    'no known row may go through ON CONFLICT DO UPDATE');
   assert.ok(!/upsert\(upserts, \{ onConflict: "id" \}\)/.test(storeSource),
     'no collection may merge-upsert its whole diff any more');
 });
@@ -159,4 +164,10 @@ test('every participant carries exactly one identity', () => {
   assert.equal(check({ ...base, profile_id: null, guest_id: uuid }), true);
   assert.equal(check({ ...base, profile_id: uuid, guest_id: uuid }), false);
   assert.equal(check({ ...base, profile_id: null, guest_id: null }), false);
+});
+
+test('an UPDATE never carries the columns that identify who created a row', () => {
+  const ctx = load();
+  const out = ctx.cloudUpdateFields({ id: 'g', created_by: 'x', created_by_profile_id: 'y', created_at: 't', phase: 'closed', closed_at: 'c' });
+  assert.deepEqual(Object.keys(out).sort(), ['closed_at', 'phase']);
 });
