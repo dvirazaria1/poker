@@ -55,3 +55,14 @@ test("the client asks permission only from the tap, and drops the subscription w
   assert.match(exit, /disablePushNotifications\(\);/);
   assert.match(html, /function enterCloudMode\(\) \{[\s\S]{0,200}reconcilePushOwnership\(\);/);
 });
+
+test("the notifications prompt is offered once, only where push works, never over a live table", () => {
+  const show = html.slice(html.indexOf("  function maybeShowPushPrompt()"), html.indexOf("  function closePushPrompt()"));
+  assert.match(show, /state\.pushPromptDismissed \|\| pushSupport\(\) !== "ok"/);
+  assert.match(show, /Notification\.permission !== "default"/);
+  assert.match(show, /appView === "game" \|\| appView === "settle"/);
+  assert.match(html, /pushPromptDismissed: !!s\.pushPromptDismissed,/);
+  assert.match(html, /document\.getElementById\("pushPromptAllow"\)\.addEventListener\("click", allowFromPushPrompt\);/);
+  // the permission request still happens inside the tap (enablePushNotifications is awaited from the click)
+  assert.match(html, /async function allowFromPushPrompt\(\) \{[\s\S]{0,200}await enablePushNotifications\(\);/);
+});

@@ -1176,6 +1176,35 @@
   }
   .ios-install-hint-close:hover { color: var(--text); }
 
+  /* ---------- notifications prompt (once, after sign-in; see refreshPushPrompt) ---------- */
+  .push-prompt {
+    position: fixed; inset: 0; z-index: 45;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px 20px; background: rgba(0,0,0,.55);
+    opacity: 0; transition: opacity .25s ease;
+  }
+  .push-prompt.open { opacity: 1; }
+  .push-prompt-card {
+    width: 100%; max-width: 360px; text-align: center;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 20px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.55);
+    padding: 26px 22px 18px;
+    transform: scale(.94); transition: transform .25s ease;
+  }
+  .push-prompt.open .push-prompt-card { transform: none; }
+  .push-prompt-icon {
+    width: 46px; height: 46px; margin: 0 auto 12px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent); background: rgba(53,224,220,.12);
+  }
+  .push-prompt-icon svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .push-prompt-title { margin: 0; font-size: 19px; font-weight: 800; color: var(--text); }
+  .push-prompt-text { margin: 8px 0 18px; font-size: 14px; font-weight: 300; color: var(--dim); line-height: 1.5; }
+  .push-prompt-card .btn-primary { width: 100%; }
+  .push-prompt-later { margin-top: 6px; min-height: 44px; width: 100%; font-size: 14px; color: var(--dim); }
+  .push-prompt-later:hover { color: var(--text); }
+  .push-prompt-error { margin: 10px 0 0; font-size: 12px; color: var(--bad); }
+
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
   }
@@ -1268,7 +1297,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 92</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 93</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -1410,6 +1439,20 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
   </button>
 </aside>
+
+<!-- Notifications prompt: asked once, after sign-in, only where push can actually work. -->
+<div class="push-prompt" id="pushPrompt" role="dialog" aria-modal="true" aria-labelledby="pushPromptTitle" hidden>
+  <div class="push-prompt-card">
+    <div class="push-prompt-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+    </div>
+    <h2 class="push-prompt-title" id="pushPromptTitle">לקבל התראות?</h2>
+    <p class="push-prompt-text">נודיע לך כשנפתח משחק בקבוצה שלך, כשנשאר חוב בסוף ערב, וכשמישהו שולח לך בקשת חברות.</p>
+    <button type="button" class="btn-primary" id="pushPromptAllow">אשר התראות</button>
+    <button type="button" class="push-prompt-later" id="pushPromptLater">לא עכשיו</button>
+    <p class="push-prompt-error" id="pushPromptError" hidden></p>
+  </div>
+</div>
 
 <div class="wrap">
   <div class="suits-mark" aria-hidden="true">
@@ -1708,6 +1751,8 @@
       // UI-only dismissal flag for the iOS install hint (see boot section). Carried inside this
       // document instead of a new localStorage key, per the "one state store" rule.
       iosInstallHintDismissed: !!s.iosInstallHintDismissed,
+      // "לא עכשיו" on the notifications prompt: never ask again on this device (settings still can).
+      pushPromptDismissed: !!s.pushPromptDismissed,
       gameId,
       history: Array.isArray(s.history) ? s.history : [],
       debts: Array.isArray(s.debts) ? s.debts.map(normalizeDebt).filter(Boolean) : [],
@@ -1753,7 +1798,8 @@
   // another server wipe.
   function freshStart(previous) {
     const s = normalize({ players: [], dataEpoch: DATA_EPOCH,
-      iosInstallHintDismissed: !!(previous && previous.iosInstallHintDismissed) });
+      iosInstallHintDismissed: !!(previous && previous.iosInstallHintDismissed),
+      pushPromptDismissed: !!(previous && previous.pushPromptDismissed) });
     s.dataEpoch = DATA_EPOCH;
     try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
     return s;
@@ -9962,10 +10008,49 @@
   // the account now signed in -- the same person reopening the app, since any sign-out or
   // account loss unsubscribes the device (exitCloudMode) before another account can see it.
   async function reconcilePushOwnership() {
+    schedulePushPrompt(); // first sign-in on this device: offer notifications once
     if (!cloudMode() || pushSupport() !== "ok" || Notification.permission !== "granted") return;
     const sub = await currentPushSubscription();
     if (sub && cloudMode()) await savePushSubscription(sub);
     refreshPushRow();
+  }
+  // The prompt: once per device, a moment after a session is ready, only when the browser can
+  // really deliver (installed app on iOS) and has not been asked yet, and never over a live table.
+  let pushPromptTimer = null;
+  function schedulePushPrompt() {
+    clearTimeout(pushPromptTimer);
+    pushPromptTimer = setTimeout(maybeShowPushPrompt, 1500);
+  }
+  function maybeShowPushPrompt() {
+    const box = document.getElementById("pushPrompt");
+    if (!box || !box.hidden) return;
+    if (!cloudMode() || state.pushPromptDismissed || pushSupport() !== "ok") return;
+    if (Notification.permission !== "default") return;
+    if (appView === "game" || appView === "settle") { schedulePushPrompt(); return; }
+    const login = document.getElementById("login");
+    if (login && !login.hidden) { schedulePushPrompt(); return; }
+    document.getElementById("pushPromptError").hidden = true;
+    box.hidden = false;
+    requestAnimationFrame(() => box.classList.add("open"));
+  }
+  function closePushPrompt() {
+    const box = document.getElementById("pushPrompt");
+    if (!box || box.hidden) return;
+    box.classList.remove("open");
+    setTimeout(() => { box.hidden = true; }, 250);
+  }
+  async function allowFromPushPrompt() {
+    const btn = document.getElementById("pushPromptAllow");
+    btn.disabled = true;
+    btn.textContent = "רגע…";
+    await enablePushNotifications();
+    btn.disabled = false;
+    btn.textContent = "אשר התראות";
+    if (pushRegisteredFor && authUser && pushRegisteredFor === authUser.id) { closePushPrompt(); return; }
+    if (Notification.permission === "denied") { state.pushPromptDismissed = true; save(); closePushPrompt(); return; }
+    const err = document.getElementById("pushPromptError");
+    err.textContent = pushMessage || "לא הצלחנו להפעיל התראות, נסו שוב.";
+    err.hidden = false;
   }
   function refreshPushRow() {
     const row = document.getElementById("setPush");
@@ -10117,6 +10202,12 @@
     showLogin();
   });
   document.getElementById("setPushBtn").addEventListener("click", enablePushNotifications);
+  document.getElementById("pushPromptAllow").addEventListener("click", allowFromPushPrompt);
+  document.getElementById("pushPromptLater").addEventListener("click", () => {
+    state.pushPromptDismissed = true;
+    save();
+    closePushPrompt();
+  });
   document.getElementById("setPushTestBtn").addEventListener("click", sendTestNotification);
   document.getElementById("setSwapBtn").addEventListener("click", () => {
     signOutAccount(); // ends the Supabase session first when there is one; no-op in local mode
