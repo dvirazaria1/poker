@@ -31,3 +31,14 @@ test("a grey waiting dot explains itself, and a code error is surfaced instead o
   assert.equal(ctx.classifyCloudError({ name: "TypeError", message: "Cannot read properties of undefined (reading 'id')" }), "surface");
   assert.equal(ctx.classifyCloudError({ message: "something else" }), "retry");
 });
+
+test("a pull settles pending ids the server already holds identically, and keeps the rest", () => {
+  const vm = require("node:vm");
+  const src = html.slice(html.indexOf("  const CLOUD_MERGED_KEYS"), html.indexOf("\n", html.indexOf("  const CLOUD_MERGED_KEYS")))
+    + "\n" + body("diffCollections") + "\n  }\n" + body("cloudStillPendingIds") + "\n  }\n";
+  const ctx = vm.createContext({});
+  vm.runInContext(src, ctx);
+  const server = { friendships: [{ id: "f1", status: "accepted" }, { id: "f2", status: "pending" }] };
+  const local = { friendships: [{ id: "f1", status: "accepted" }, { id: "f2", status: "accepted" }, { id: "f3", status: "pending" }] };
+  assert.deepEqual(Array.from(ctx.cloudStillPendingIds(["f1", "f2", "f3"], server, local)), ["f2", "f3"]);
+});

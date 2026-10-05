@@ -1280,7 +1280,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 87</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 88</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -2780,10 +2780,19 @@
     }
     const merged = normalize(mergeCloudIntoState(state, pulled, { keepLocalIds: cloudKeepLocalIds() }));
     if (merged) state = merged;
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
     // The baseline is what the SERVER holds, not what we now hold: a record the merge kept is
     // absent from it and goes up on the next push (that is the first-device seeding rule).
     lastPushedRows = serverBaseline;
+    // A pending id only ever cleared on a push that confirmed it. A record that arrived by pull (a
+    // friendship somebody else's phone created) was marked pending by the next save and then sat
+    // there forever -- identical on both sides, so no push ever had a reason to run. Anything the
+    // server now holds exactly as this device does is no longer pending; anything that differs
+    // still is, and gets a push.
+    const stillPending = cloudStillPendingIds(state.cloudPendingIds, serverBaseline,
+      buildCloudRows(cloudCollections(), cloudContext()));
+    state.cloudPendingIds = stillPending;
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+    if (stillPending.length && !cloudPushTimer && !cloudPushing) scheduleCloudPush();
     // A failed optional read (or a row that cannot be read back) keeps the dot honest instead of
     // letting a partial pull claim "synced"; cloudLastError says which, so a red dot always
     // explains itself.
@@ -5504,6 +5513,17 @@
       if (row && row.id) next.delete(String(row.id));
     }));
     return next;
+  }
+  // Pending ids that a pull did NOT settle: kept when the local row differs from the server's,
+  // or when the server does not hold it at all; dropped when both sides agree exactly.
+  function cloudStillPendingIds(pending, serverRows, localRows) {
+    const settled = new Set();
+    CLOUD_MERGED_KEYS.forEach(key => {
+      const server = Array.isArray((serverRows || {})[key]) ? serverRows[key] : [];
+      const dirty = new Set(diffCollections(server, (localRows || {})[key] || [], "id").upserts.map(row => String(row.id)));
+      server.forEach(row => { if (row && row.id && !dirty.has(String(row.id))) settled.add(String(row.id)); });
+    });
+    return (pending || []).map(String).filter(id => !settled.has(id));
   }
   function keepLocalIdsFor(pending, unconfirmedIds) {
     const ids = new Set((Array.isArray(unconfirmedIds) ? unconfirmedIds : []).map(String));
