@@ -162,7 +162,7 @@ test('the pull only trusts the aggregate cache when both aggregate queries came 
   assert.match(pullSrc, /group_game_summaries_v/);
   assert.match(pullSrc, /groupAggregatesOk\s*=\s*!leaderboardResult\.error\s*&&\s*!gameSummariesResult\.error/);
   const applySrc = sourceBetween('  function applyCloudPull(payload, pullSeq, pullAccountId) {', '    const groupRows = payload.groups || [];');
-  assert.match(applySrc, /available:\s*!!payload\.groupAggregatesOk/);
+  assert.match(applySrc, /if \(payload\.groupAggregatesOk\) \{\s*cloudGroupAggregates = \{\s*available:\s*true/);
 });
 
 test('every group screen call site passes the aggregate cache through to the resolvers', () => {
