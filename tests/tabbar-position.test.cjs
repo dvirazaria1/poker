@@ -39,10 +39,8 @@ const CONTAINING_BLOCK_PROPS = /\btransform\s*:|(?<!backdrop-)\bfilter\s*:|backd
 
 test('the tab bar\'s own bottom offset folds in env(safe-area-inset-bottom), like .wrap\'s padding-bottom already does', () => {
   const body = ruleBody('  .tabbar {');
-  // The inset alone was not enough: it is constant while Safari's toolbar collapses, so the bar
-  // still slid on a scrollable tab. --vv-offset carries that difference (see initTabbarViewportPin).
-  assert.match(body, /bottom:\s*calc\(10px \+ env\(safe-area-inset-bottom,\s*0px\) \+ var\(--vv-offset,\s*0px\)\)/,
-    '.tabbar must anchor off the safe-area inset AND the visual-viewport gap, not a bare px');
+  assert.match(body, /bottom:\s*calc\(10px \+ env\(safe-area-inset-bottom,\s*0px\)\)/,
+    '.tabbar must anchor off the same dynamic inset .wrap uses, not a bare px');
   // the sibling rule this idiom is mirrored from, so a future edit to one is caught if it drifts
   // from the other
   const wrapBody = ruleBody('  .wrap {');
@@ -82,20 +80,20 @@ test('the bar\'s height stays pinned (the earlier fix) and .kb-open still slides
 
 // ---------- the remaining movement was iOS Safari's collapsing toolbar ----------
 
-test('the bar is pinned to the VISUAL viewport, not just the layout one', () => {
+test('the bar compensates for the browser chrome, in CSS, with nothing to keep in sync', () => {
   // Measured in Chromium the bar never moved (top 750 / bottom 808 on every tab, scrolled or
-  // not) and nothing in its ancestor chain creates a containing block — so `position: fixed`
-  // was already correct. What still moved it on the owner's iPhone is Safari collapsing its
-  // toolbar on a scrollable tab, which grows the visual viewport under a layout-fixed element.
-  assert.match(html, /function initTabbarViewportPin\(\)/);
-  assert.match(html, /window\.visualViewport/);
-  assert.match(html, /vv\.addEventListener\("resize", apply\)/);
-  assert.match(html, /vv\.addEventListener\("scroll", apply\)/);
-  assert.match(html, /setProperty\("--vv-offset"/);
-  // Absent visualViewport must leave the old behaviour untouched, not throw.
-  assert.match(html, /if \(!vv \|\| !bar\) return;/);
-  // The keyboard shrinks the same viewport; .kb-open already handles that, so a keyboard-sized
-  // gap must not launch the bar up the screen.
-  assert.match(html, /hidden > 160 \? 0 : hidden/);
-  assert.match(html, /initTabbarViewportPin\(\);/);
+  // not) and nothing in its ancestor chain creates a containing block — `position: fixed` was
+  // already correct. iOS Safari positions a fixed element against the LARGE viewport, so while
+  // its toolbar is showing the bar sits behind that chrome and springs up when it collapses;
+  // switching tabs flips that state, which is what the owner sees.
+  const guard = html.match(/@supports \(height: 100dvh\) and \(height: 100lvh\) \{[^}]*\}[^}]*\}/);
+  assert.ok(guard, 'the compensation must be behind an @supports guard, so older engines keep the plain rule');
+  // (100lvh - 100dvh) IS the height of the browser UI currently on screen: 0 when hidden, its
+  // full height when showing.
+  assert.match(guard[0], /bottom: calc\(10px \+ env\(safe-area-inset-bottom, 0px\) \+ \(100lvh - 100dvh\)\)/);
+  // One mechanism only: a JS listener doing the same sum would double-count it.
+  assert.doesNotMatch(html, /--vv-offset/, 'the JS pin was replaced by this rule, not stacked with it');
+  assert.doesNotMatch(html, /initTabbarViewportPin/);
+  // The keyboard still gets its own treatment, which this must not have disturbed.
+  assert.match(html, /\.tabbar\.kb-open \{[^}]*translateY/);
 });

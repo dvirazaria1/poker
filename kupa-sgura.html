@@ -140,25 +140,19 @@
   :root[data-theme="light"] { --bar-bg: rgba(245,248,249,.9); }
   html { background: var(--bg); }
   .tabbar {
-    /* env(safe-area-inset-bottom) is not a fixed device constant on iOS Safari: WebKit reports it
-       as ~0 while the bottom toolbar is showing (its own chrome already clears the home indicator)
-       and jumps it to the home-indicator height once the toolbar auto-hides on scroll (now page
-       content reaches the true bottom edge, so the page must clear the indicator itself). A plain
-       `bottom: 10px` ignores that swing, so the exact same rule sits 10px above a SHORT screen's
-       toolbar-occupied bottom (a visible gap -- the friends tab, which never scrolls) but only 10px
-       above the true device edge once a tall screen (the games tab) is scrolled and the toolbar
-       collapses -- reproducing the reported "bar creeps toward the home indicator" jump without
-       any change to the bar's own DOM/CSS. `.wrap`'s padding-bottom already folds this same inset
-       in (see its calc() below); mirror that idiom here so the bar keeps a constant 10px from the
-       real device edge in both toolbar states, matching `.wrap`.
-    */
-    /* --vv-offset is the gap iOS Safari opens between the layout viewport (what `bottom` is
-       measured against) and the visual viewport (what you can actually see) as its toolbar
-       collapses on scroll. Without it the bar slides down on a scrollable tab and sits still on
-       a short one -- which reads as "the bar moves depending on how much content there is".
-       0 everywhere else, so desktop and the installed PWA are unaffected. */
+    /* Why this is not just `bottom: 10px`.
+       iOS Safari positions a fixed element against the LARGE viewport — the page as it is when
+       the browser's own toolbar is hidden. While that toolbar is showing, the bottom of that
+       viewport is behind it, so the bar is pushed down under the chrome; when the toolbar
+       collapses the bar springs back up. Switching tabs flips that state (a short screen cannot
+       scroll, so the toolbar stays out; a long one lets it collapse), which is exactly the
+       "the bar moves when I change tabs" the owner sees — and it never reproduces in a desktop
+       browser, which has no collapsing toolbar.
+       (100lvh - 100dvh) IS the height of the browser UI currently on screen: 0 when it is hidden,
+       its full height when it is showing. Adding it keeps the bar the same distance above what
+       the eye actually sees, in both states, with no JS and nothing to keep in sync. */
     position: fixed;
-    bottom: calc(10px + env(safe-area-inset-bottom, 0px) + var(--vv-offset, 0px));
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     inset-inline: 17px; margin-inline: auto;
     max-width: 470px; z-index: 20;
     background: var(--bar-bg);
@@ -168,6 +162,9 @@
     padding: 6px 10px;
     box-shadow: 0 8px 28px rgba(0,0,0,.35);
     transition: transform .25s ease, opacity .25s ease;
+  }
+  @supports (height: 100dvh) and (height: 100lvh) {
+    .tabbar { bottom: calc(10px + env(safe-area-inset-bottom, 0px) + (100lvh - 100dvh)); }
   }
   :root[data-theme="light"] .tabbar { box-shadow: 0 8px 24px rgba(12,21,25,.14); }
   .tabbar.kb-open { transform: translateY(120px); opacity: 0; pointer-events: none; }
@@ -1246,7 +1243,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 74</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 75</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -6198,23 +6195,6 @@
     if (appView === "group") { setAppView("games"); return true; }
     return false;
   }
-  // See the --vv-offset note on .tabbar. visualViewport is absent on older engines; the bar then
-  // behaves exactly as it did before, which is correct everywhere that has no collapsing toolbar.
-  function initTabbarViewportPin() {
-    const vv = window.visualViewport;
-    const bar = document.querySelector(".tabbar");
-    if (!vv || !bar) return;
-    const apply = () => {
-      const hidden = Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)));
-      // The keyboard also shrinks the visual viewport, but .kb-open already slides the bar away
-      // for that; clamping keeps a keyboard-sized gap from launching the bar up the screen.
-      bar.style.setProperty("--vv-offset", (hidden > 160 ? 0 : hidden) + "px");
-    };
-    vv.addEventListener("resize", apply);
-    vv.addEventListener("scroll", apply);
-    apply();
-  }
-
   function initGroupModalDismissal() {
     document.addEventListener("keydown", (e) => {
       // Let the group-settings overlay above us take Escape first.
@@ -9838,7 +9818,6 @@
   render();
   initIosInstallHint();
   initGroupModalDismissal();
-  initTabbarViewportPin();
   if (typeof screen.orientation?.lock === "function" && matchMedia("(display-mode: standalone)").matches) {
     try { screen.orientation.lock("portrait").catch(() => {}); } catch (e) {}
   }
