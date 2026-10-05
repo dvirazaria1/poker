@@ -216,5 +216,8 @@ test('finish-game gates and the group summary use isGameOpen, not phase alone', 
   const finish = sourceBetween('  function finishGame() {', '  function returnToGameEdit() {');
   assert.match(finish, /!isGameOpen\(state\)/);
   const summary = sourceBetween('  function getGroupSummary(collections, groupId, meName, aggregates) {', '  function getGroupSummaries(');
-  assert.match(summary, /const hasActiveGame = isGameOpen\(currentGame\) && currentGame\.groupId === groupId;/);
+  // The local slot still goes through isGameOpen; a server-known open game (another member's table)
+  // is the second source, added 2026-10-05 for live group cards.
+  assert.match(summary, /const localActive = isGameOpen\(currentGame\) && currentGame\.groupId === groupId;/);
+  assert.match(summary, /const hasActiveGame = localActive \|\| !!serverOpen;/);
 });

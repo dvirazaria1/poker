@@ -729,7 +729,7 @@
   .profile-tab.active { color: var(--text); border-bottom-color: var(--accent); }
   .profile-tab-badge { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px rgba(53,224,220,.1); }
   .debt-tabs { display: flex; justify-content: center; gap: 4px; width: 100%; max-width: 360px; margin: 0 auto 14px; border-bottom: 1px solid var(--line); }
-  .debt-tab { flex: 1; color: var(--dim); font-size: 16px; font-weight: 500; padding: 8px 18px 9px; border-bottom: 2px solid transparent; }
+  .debt-tab { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--dim); font-size: 16px; font-weight: 500; padding: 8px 18px 9px; border-bottom: 2px solid transparent; }
   .debt-tab:hover { color: var(--text); }
   .debt-tab.active { color: var(--text); border-bottom-color: var(--accent); }
   .who-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
@@ -1277,7 +1277,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 83</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 84</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -2154,6 +2154,7 @@
   function cloudRetryNow() {
     if (!cloudMode()) return;
     syncCloudGameChannel(); // a channel that reported an error is recreated here (no-op when healthy)
+    syncCloudAccountChannel();
     if (cloudReconnectOrder(cloudOutboxSignal()) === "pull-then-push") { pullCloud(); return; }
     clearTimeout(cloudPushTimer);
     cloudPushTimer = null;
@@ -2652,6 +2653,11 @@
     (payload.openGames || []).concat(payload.closedGames || []).forEach(row => {
       if (row && row.id && row.created_by) cloudGameCreators[String(row.id)] = row.created_by;
     });
+    // Which of my groups has a table open right now, straight from the games rows: games_select
+    // shows an open group game to every active member, while player-boundary hides its players
+    // from anyone not seated at it -- so this is the only way a member who is not playing still
+    // sees "משחק פעיל" on the group card the moment somebody opens one.
+    cloudGroupAggregates = { ...cloudGroupAggregates, openGames: cloudGroupOpenGames(payload.openGames) };
     // The creators above came from the games query itself, which succeeded; the snapshots below
     // are what a failed child read would corrupt, so a held pull carries no game rows to map.
     if (gamesHeld) payload = { ...payload, openGames: [], closedGames: [] };
@@ -2768,6 +2774,56 @@
     render();
     refreshSyncDot();
     syncCloudGameChannel();
+  }
+
+  // ---- realtime: the account ----
+  // One channel per signed-in account for the rows that change the home screens: a game opening or
+  // closing in one of my groups (and, once published, memberships, friend requests and debts).
+  // postgres_changes respects RLS, so an unfiltered subscription still only delivers rows this
+  // person can read. No event is applied from its payload: each one becomes the same debounced
+  // full pull the app already trusts. The open table keeps its own finer channel below.
+  // Every table listed here must be in the supabase_realtime publication -- an unpublished one
+  // fails the whole channel (docs/backend/realtime-publication.sql).
+  const CLOUD_ACCOUNT_TABLES = ["games"];
+  let cloudAccountChannel = null;
+  let cloudAccountChannelUser = "";
+  let cloudAccountChannelBroken = false;
+  function syncCloudAccountChannel() {
+    if (!supabase || !authUser) return leaveCloudAccountChannel();
+    if (cloudAccountChannel && cloudAccountChannelUser === authUser.id && !cloudAccountChannelBroken) return;
+    leaveCloudAccountChannel();
+    const userId = authUser.id;
+    try {
+      let channel = supabase.channel("account:" + userId);
+      CLOUD_ACCOUNT_TABLES.forEach(table => {
+        channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, () => scheduleCloudPull(600));
+      });
+      cloudAccountChannel = channel;
+      cloudAccountChannelUser = userId;
+      channel.subscribe(status => {
+        if (cloudAccountChannel !== channel) return; // a channel we already replaced
+        if (status === "SUBSCRIBED") {
+          // A re-join after a drop may have missed events; the first join follows a full pull anyway.
+          if (cloudAccountChannelBroken) scheduleCloudPull(300);
+          cloudAccountChannelBroken = false;
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          // Not red: nothing is lost, the screens are just not live. cloudRetryNow (foreground,
+          // online, a dot tap) recreates it and pulls.
+          cloudAccountChannelBroken = true;
+        }
+      });
+    } catch (e) {
+      cloudAccountChannel = null;
+      cloudAccountChannelUser = "";
+    }
+  }
+  function leaveCloudAccountChannel() {
+    const channel = cloudAccountChannel;
+    cloudAccountChannel = null;
+    cloudAccountChannelUser = "";
+    cloudAccountChannelBroken = false;
+    if (!supabase || !channel) return;
+    try { supabase.removeChannel(channel); } catch (e) {}
   }
 
   // ---- realtime: the open table ----
@@ -2914,6 +2970,7 @@
     cloudSurfaceError = false;
     cloudGuestRows = [];
     cloudGroupAggregates = { available: false, leaderboard: [], gameSummaries: [] };
+    syncCloudAccountChannel();
     // Push before pull: anything still unconfirmed locally must reach the server before the
     // server's view can overwrite it. The guest cache is rebuilt by that first pull.
     pushCloud().then(() => { if (cloudMode()) return pullCloud(); }).catch(() => {});
@@ -2938,6 +2995,7 @@
     cloudGroupAggregates = { available: false, leaderboard: [], gameSummaries: [] };
     pendingCloudGame = null;
     leaveCloudGameChannel();
+    leaveCloudAccountChannel();
     setSync(false, "שמירה מקומית");
   }
 
@@ -3523,7 +3581,10 @@
     const active = activeMembers(members, groupId);
     const games = resolveGroupGameSummaries(c, groupId, aggregates);
     const currentGame = c.currentGame || {};
-    const hasActiveGame = isGameOpen(currentGame) && currentGame.groupId === groupId;
+    const localActive = isGameOpen(currentGame) && currentGame.groupId === groupId;
+    const serverOpen = !localActive && aggregates && Array.isArray(aggregates.openGames)
+      ? aggregates.openGames.find(g => g && g.groupId === groupId) : null;
+    const hasActiveGame = localActive || !!serverOpen;
     const leaderboard = resolveGroupLeaderboard(c, groupId, aggregates);
     const topRank = leaderboard.length ? leaderboard[0].rank : null;
     const leaderNames = topRank === null ? [] : leaderboard.filter(l => l.rank === topRank).map(l => l.displayName);
@@ -3534,7 +3595,7 @@
       memberCount: active.length,
       members: active.map(m => m.displayName),
       hasActiveGame,
-      activeGamePhase: hasActiveGame ? currentGame.phase : null,
+      activeGamePhase: localActive ? currentGame.phase : serverOpen ? serverOpen.phase : null,
       gameCount: games.length,
       lastGameAt: games.length ? games[0].at : null,
       leaderNames,
@@ -4922,6 +4983,11 @@
   // the server's game, the same game replaces itself, and a DIFFERENT open game on this device
   // wins -- the local table is the one somebody is standing at. Documented limitation, not a bug:
   // the second open game becomes reachable only once that local one is closed.
+  function cloudGroupOpenGames(rows) {
+    return (Array.isArray(rows) ? rows : [])
+      .filter(row => row && row.group_id && (row.phase === "active" || row.phase === "settlement"))
+      .map(row => ({ groupId: String(row.group_id), gameId: String(row.id || ""), phase: row.phase }));
+  }
   function pickCloudOpenGame(localGame, openGames) {
     const games = (Array.isArray(openGames) ? openGames : []).filter(Boolean);
     if (!games.length) return { action: "keep", game: null };
@@ -9220,11 +9286,17 @@
       ["owed", "אני חייב", openDebts.filter(debt => debt.debtorName === me), false],
       ["owedToMe", "חייבים לי", openDebts.filter(debt => debt.creditorName === me), true],
     ];
-    debtTabOptions.forEach(([key, label]) => {
+    debtTabOptions.forEach(([key, label, list]) => {
       const tab = el("button", "debt-tab" + (debtTab === key ? " active" : ""), label);
       tab.type = "button";
       tab.setAttribute("role", "tab");
       tab.setAttribute("aria-selected", String(debtTab === key));
+      // Money owed to me keeps its dot until it is marked paid -- not merely until it is seen.
+      if (key === "owedToMe" && list.length) {
+        const badge = el("span", "profile-tab-badge");
+        badge.setAttribute("aria-label", "יש כסף שעוד לא הועבר אליך");
+        tab.appendChild(badge);
+      }
       tab.addEventListener("click", () => {
         if (debtTab === key) return;
         debtTab = key;
