@@ -1304,7 +1304,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 98</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 99</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -5209,6 +5209,13 @@
     };
   }
 
+  // A table this device just closed, deleted or left: drop it from the server's open-table list at
+  // once, so its group card stops saying "משחק פעיל" before the next pull confirms it.
+  function forgetServerOpenGame(aggregates, gameId) {
+    const a = aggregates || {};
+    if (!Array.isArray(a.openGames)) return a;
+    return { ...a, openGames: a.openGames.filter(g => g && g.gameId !== String(gameId || "")) };
+  }
   function cloudGroupOpenGames(rows) {
     return (Array.isArray(rows) ? rows : [])
       .filter(row => row && row.group_id && (row.phase === "active" || row.phase === "settlement"))
@@ -8640,6 +8647,7 @@
     // closed/empty defaults itself -- the same reset every other close already produced, just
     // derived instead of hand-assigned (see the staleness guard in
     // tests/multi-game-migration.test.cjs).
+    cloudGroupAggregates = forgetServerOpenGame(cloudGroupAggregates, state.gameId);
     state.games = (Array.isArray(state.games) ? state.games : []).filter(g => g.gameId !== state.gameId);
     state.gameId = newId();
     expandedEntries.clear();
@@ -9775,6 +9783,7 @@
       state.leftGameIds = [...(state.leftGameIds || []).filter(id => id !== gameId), gameId].slice(-50);
     }
     disarmResetCorner();
+    cloudGroupAggregates = forgetServerOpenGame(cloudGroupAggregates, gameId);
     state = newCurrentGame(state, { phase: "closed" });
     expandedEntries.clear();
     openMenu = null; customOpen = null;

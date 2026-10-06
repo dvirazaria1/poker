@@ -134,3 +134,13 @@ test("delete shows a bin; the first tap turns it red with the cost spelled out, 
   assert.match(handler, /btn\.classList\.add\("danger-armed"\);\s*if \(isGameOpener\(state\.gameId\)\) document\.getElementById\("resetNote"\)\.hidden = false;/);
   assert.match(handler, /resetArmed = setTimeout\(disarmResetCorner, 5000\);/);
 });
+
+test("closing, deleting or leaving a table clears its group's 'משחק פעיל' at once, not after the next pull", () => {
+  const c4 = vm.createContext({});
+  vm.runInContext(fn("forgetServerOpenGame"), c4);
+  const out = JSON.parse(vm.runInContext("JSON.stringify(forgetServerOpenGame({ available: true, openGames: [{ groupId: 'g', gameId: 'a' }, { groupId: 'h', gameId: 'b' }] }, 'a'))", c4));
+  assert.deepEqual(out.openGames.map(g => g.gameId), ["b"]);
+  assert.equal(out.available, true);
+  assert.match(fn("finishCloseTable"), /cloudGroupAggregates = forgetServerOpenGame\(cloudGroupAggregates, state\.gameId\);/);
+  assert.match(html, /disarmResetCorner\(\);\s*cloudGroupAggregates = forgetServerOpenGame\(cloudGroupAggregates, gameId\);/);
+});
