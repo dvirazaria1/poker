@@ -50,3 +50,7 @@ test("the quarantine is released on boot and on a dot tap, and never counts as w
 test("a debt that failed to upload after its game closed is retried, not dropped as frozen (review P8)", () => {
   assert.match(fn("pushCloudRun"), /: pair\[0\] === "debts" \? \(next\[pair\[0\]\] \|\| \[\]\)\.filter\(row => !foreignClosed\.has\(String\(row\.game_id\)\)\)/);
 });
+
+test("a refused batch of one row names that row, so the quarantine can set it aside", () => {
+  assert.match(fn("cloudNameRefusedRow"), /if \(rows && rows\.length === 1\) return tagCloudError\(error, table, rows\[0\]\);/);
+});

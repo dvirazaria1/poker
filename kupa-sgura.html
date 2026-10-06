@@ -1304,7 +1304,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 97</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 98</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -2586,6 +2586,9 @@
   async function cloudNameRefusedRow(error, table, rows) {
     tagCloudError(error, table);
     if (!supabase) return error;
+    // A batch of one already names its row (no probe needed) -- without this a lone refused row
+    // was never identified, so the quarantine could not set it aside and it blocked everything.
+    if (rows && rows.length === 1) return tagCloudError(error, table, rows[0]);
     if (!rows || rows.length < 2 || classifyCloudError(error) !== "surface") return error;
     for (const row of rows) {
       const result = await supabase.from(table).upsert([row], { onConflict: "id", ignoreDuplicates: true });
