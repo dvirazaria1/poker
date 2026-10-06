@@ -68,14 +68,17 @@ test('the code field is a single input with the right autofill/keyboard/length c
   const codeStep = login.slice(login.indexOf('id="authCodeStep"'), login.indexOf('id="authLocal"'));
   assert.match(codeStep, /id="authCode"[^>]*autocomplete="one-time-code"/);
   assert.match(codeStep, /id="authCode"[^>]*inputmode="numeric"/);
-  assert.match(codeStep, /id="authCode"[^>]*maxlength="6"/);
+  assert.match(codeStep, /id="authCode"[^>]*maxlength="10"/);
   assert.match(codeStep, /id="authCode"[^>]*dir="ltr"/);
   // only one code input in the whole step — not six digit boxes
   assert.equal((codeStep.match(/id="authCode"/g) || []).length, 1);
 });
 
 test('the code auto-verifies ~250ms after the 6th digit, with "אישור" kept as a manual fallback', () => {
-  assert.match(appScript, /digits\.length === 6\) authAutoVerifyTimer = setTimeout\(verifyEmailCode, 250\)/);
+  // The project sends 8-digit codes (Supabase Email OTP length); manual entry accepts 6-10.
+  assert.match(appScript, /const AUTH_CODE_LENGTH = 8;/);
+  assert.match(appScript, /digits\.length === AUTH_CODE_LENGTH\) authAutoVerifyTimer = setTimeout\(verifyEmailCode, 250\)/);
+  assert.match(appScript, /if \(token\.length < 6 \|\| token\.length > 10\) \{/);
   assert.ok(login.includes('>אישור<'), 'the manual confirm button text stays');
 });
 
