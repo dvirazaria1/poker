@@ -126,3 +126,11 @@ test("the corner button: the opener deletes the table for everyone, anyone else 
   // offline, or never on the server: the table is this device's own
   assert.match(fn("isGameOpener"), /if \(!cloudMode\(\) \|\| !cloudKnownGameIds\(\)\.has\(id\)\) return true;/);
 });
+
+test("delete shows a bin; the first tap turns it red with the cost spelled out, the second deletes", () => {
+  assert.match(html, /<span class="corner-note" id="resetNote" hidden>הנתונים מהשולחן לא ירשמו<\/span>/);
+  assert.match(html, /delete: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16">/);
+  const handler = html.slice(html.indexOf('document.getElementById("resetBtn").addEventListener("click"'), html.indexOf('// ---------- group settings overlay: UI-only state'));
+  assert.match(handler, /btn\.classList\.add\("danger-armed"\);\s*if \(isGameOpener\(state\.gameId\)\) document\.getElementById\("resetNote"\)\.hidden = false;/);
+  assert.match(handler, /resetArmed = setTimeout\(disarmResetCorner, 5000\);/);
+});
