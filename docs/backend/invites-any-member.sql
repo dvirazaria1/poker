@@ -1,7 +1,7 @@
 -- =====================================================================
 -- "סוגרים קופה" — invites-any-member.sql
 --
--- DECISION PENDING — do not run until the owner chooses. See below.
+-- DECIDED 2026-10-06: the owner chose A (any active member may invite). Applied the same day.
 --
 -- WHAT THIS IS
 -- The app and the database disagree about who may create a group invite,
@@ -42,19 +42,25 @@
 BEGIN;
 
 -- Same shape as before, with app_is_group_admin widened to active membership.
--- created_by_profile_id = app_current_profile_id() is kept: an invite still
--- records who really made it, and nobody can forge another member's name onto
--- one. Revoking remains invites_update_admin, untouched.
+-- created_by_profile_id = app_current_profile_id() is kept: an invite still records who really
+-- made it, and nobody can forge another member's name onto one. Revoking remains
+-- invites_update_admin, untouched.
+--
+-- Revised 2026-10-06 before applying: the original draft (written before link-guest.sql) dropped
+-- the guest-binding guard. It is kept here, short-circuited for the common unbound invite:
+-- app_guest_bindable_to_invite answers false for anyone who is not an admin of the group
+-- (invite-helper-grant.sql), so binding an invite to a guest stays admin-only while a plain
+-- invite is open to every active member.
 DROP POLICY IF EXISTS invites_insert_admin ON invites;
+DROP POLICY IF EXISTS invites_insert_member ON invites;
 CREATE POLICY invites_insert_member ON invites FOR INSERT TO authenticated
   WITH CHECK (
     app_is_active_group_member(group_id)
     AND created_by_profile_id = app_current_profile_id()
+    AND (bound_guest_id IS NULL OR app_guest_bindable_to_invite(bound_guest_id, group_id))
   );
 
 COMMIT;
 
--- Verify afterwards (read-only):
---   SELECT polname, pg_get_expr(polwithcheck, polrelid)
---     FROM pg_policy WHERE polrelid = 'invites'::regclass AND polcmd = 'a';
---   -- expect invites_insert_member, and app_is_active_group_member in the expression
+SELECT polname, pg_get_expr(polwithcheck, polrelid) AS with_check
+  FROM pg_policy WHERE polrelid = 'invites'::regclass AND polcmd = 'a';

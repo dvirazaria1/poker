@@ -1297,7 +1297,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 93</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 94</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -7728,15 +7728,15 @@
     const section = el("section", "games-section games-invite-section");
     section.appendChild(el("h3", "games-section-title", "הזמנה לקבוצה"));
     if (!invite) {
-      if (!isAdmin) {
-        section.appendChild(el("p", "games-invite-note", "רק מנהל הקבוצה יכול ליצור הזמנה"));
-        return section;
+      // Any active member may create an invite (DESIGN.md; invites-any-member.sql, 2026-10-06).
+      // Binding it to a guest is admin-only: the server's guard answers false for anyone else.
+      if (isAdmin) {
+        const bindPicker = renderInviteGuestBindPicker(summary.groupId);
+        if (bindPicker) section.appendChild(bindPicker);
       }
-      const bindPicker = renderInviteGuestBindPicker(summary.groupId);
-      if (bindPicker) section.appendChild(bindPicker);
       const createBtn = el("button", "games-invite-create", "צור הזמנה");
       createBtn.type = "button";
-      createBtn.addEventListener("click", () => createGroupInvite(summary.groupId, inviteBindGuestId));
+      createBtn.addEventListener("click", () => createGroupInvite(summary.groupId, isAdmin ? inviteBindGuestId : null));
       section.appendChild(createBtn);
       return section;
     }
