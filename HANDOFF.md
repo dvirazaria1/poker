@@ -168,13 +168,13 @@ project's "keep one source of truth" rule; nothing here is a second store.
 
 ## Documented limitations (intentional, not bugs)
 
-- **Single active game slot** — the engine still has exactly one current-game slot per device
-  (`state.players/phase/gameId`), so a group can have at most one open game **and** the whole device
-  can only have one open game at a time, even across different groups. `canStartGroupGame()` reports
-  `group-has-open-game` vs `another-game-open` accordingly. The backend removes the second
-  limitation: `schema.sql`'s `games_one_open_per_group_uk` is a per-group unique index, not per-device.
-  In cloud mode this shows up as `pickCloudOpenGame()`: a second open game on the server is kept
-  waiting (and logged) rather than replacing the table somebody is standing at.
+- **One open table per group** (not per device — that limit is gone since v91, see "October 2026"
+  below). `games_one_open_per_group_uk` enforces it on the server; `canStartGroupGame(collections,
+  groupId, serverOpenGames)` refuses `group-has-open-game` from a local slot or from the server's open
+  list. Two phones starting the same group at once: the loser's INSERT fails 23505 and is quarantined.
+- **A member who is not seated cannot enter a table.** The group card says "משחק פעיל" (from the raw
+  games rows) but player-boundary hides the players, so there is no join/watch path. Owner decision
+  2026-10-06: keep it that way for now.
 - **Hybrid identity** — Supabase phase 1 fills `me` from `profiles.display_name`, and since phase 2b
   a `ParticipantRef` keeps a `userId` when the server supplied one. Group membership and admin
   checks prefer that stable profile id, so a later display-name edit does not hide group settings.
@@ -185,9 +185,6 @@ project's "keep one source of truth" rule; nothing here is a second store.
   leaderboard" is defined as "matches a `GroupMember` record of this group, in any status" rather
   than the spec's `userId != null`. Ad-hoc game guests who never joined the group are excluded. This
   tightens to `userId != null` post-backend without touching the UI (`isLeaderboardEligible`).
-- **QR placeholder** — the invite block always renders a QR-shaped tile with explanatory text
-  instead of an actual QR code; encoding `inviteLink()` into a real QR is deferred, not missing by
-  accident.
 - **`HISTORY_MAX` is 400**, not the old 60 — the leaderboard and group history need the full group
   history, not just a recent slice. Anything beyond that cap on a given device is simply absent from
   a local-state export (see `docs/backend/migration-from-local-state.md`).
@@ -493,30 +490,82 @@ existing friend or group-mate, while a friend-invite token remains secret by des
 
 ## Current release snapshot
 
-- Git remote: `https://github.com/dvirazaria/da-jwt.git`.
-- Current commit at handoff: `ca8b75c` (the groups/friends/invites foundation — plan
-  `docs/superpowers/plans/2026-09-07-groups-foundation.md` — is complete through Task 19 and on
-  `main`; see `docs/superpowers/plans/2026-09-08-pre-backend-gaps.md` for the Task 19 gap audit).
-- Release builder version: `43`; generated service-worker cache is `kupa-v43`.
+- Git remote: `https://github.com/dvirazaria1/poker.git`. Vercel project `poker` (team
+  `dvirazaria1-3527s-projects`) deploys every push to `main` — if a push does not deploy, first check
+  that Settings → Git still shows the repo connected (it silently dropped once, 2026-09-12 → 10-05).
+- Release builder version: `100` (October 2026); the service-worker cache is `kupa-v100`.
+- Tests: ~750 across `tests/*.test.cjs` (`node --test tests/*.test.cjs`).
 - Live deployment: `https://poker-tau-pink.vercel.app/`.
 - `archive/all-in-cash/` is an unrelated old prototype, ignored by Git and excluded from Vercel. Do not use it as the source for this app.
 - The current local identity is a typed name (`poker-settle-me`), not authentication. Do not treat it as secure identity or build authorization on it.
 
 ## Next work boundaries
 
-The next major milestone is real multi-user persistence. Before implementing it, read
-`docs/backend-readiness.md` and `docs/backend/frontend-seam.md` — they already inventory exactly
-which functions change (`initSync`, `remoteBody`, `applyRemote`, `scheduleRemoteSave` on the sync
-side) and which don't, so this isn't a cold start. Supabase is the agreed and researched direction
-(`docs/backend/platform-research.md`), and `docs/backend/schema.sql`/`rls-policies.sql` are ready to
-run — but no Supabase project exists yet; step 1 of the connection plan needs the owner's own
-account. Never place keys in source, commits, `index.html`, or Vercel static assets.
+The backend is live (Supabase project `kupa-sgura-prod`, ref `aztfjlssjbjhxdqsflgn`); see the two
+"applied" sections below. Open items as of 2026-10-06:
 
-The Games dashboard's group data is real (`getGroupSummaries(collectionsOf(state), me)`, `+ צור קבוצה`
-enabled), but it is still entirely local/per-device: no remote membership, no real invite redemption,
-no cross-device identity. `ActiveGameSummary` remains the only data shape the active-game dashboard
-UI should consume; `GroupSummary`/`LeaderboardEntry`/`GroupGameSummary` are the equivalent contracts
-for groups. Card/panel expansion stays in-memory UI state and must never call `save()`.
+- **Two-phone verification nobody has done yet:** joining by link/QR (including a link a non-admin
+  created), two tables at once with live buy-ins, push notifications (game opened, debt created/paid,
+  friend request), "עזוב שולחן" on someone else's table.
+- **Owner decisions taken:** any active member may invite (applied); a member not seated at a table
+  stays unable to enter it; no per-account isolation on a shared phone (nobody shares phones).
+- **Deferred:** avatars as uploaded files, app-store packaging, pagination of large reads, per-account
+  local caches.
+
+`ActiveGameSummary` remains the only data shape the active-game dashboard UI consumes;
+`GroupSummary`/`LeaderboardEntry`/`GroupGameSummary` are the equivalent contracts for groups.
+Card/panel expansion stays in-memory UI state and must never call `save()`. Never place keys in
+source, commits, `index.html`, or Vercel static assets.
+
+## October 2026 — what changed and where it lives
+
+**Several open tables (multi-game Round 2, v91; plan `docs/superpowers/plans/2026-10-05-multi-game-round2.md`).**
+`state.games` is the store; `state.gameId` is the persisted *current-table pointer*;
+`syncCurrentGameMirror` (still the only writer of `state.players/phase/…`) mirrors the pointer's slot
+for the ~80 legacy readers. Start a table: `openNewGameSlot` (never drops another open table, only an
+empty current one). Enter one: `enterActiveGame(id)` → `resetTableUi()` → `selectGameSlot`. The pull
+merges with `mergeOpenGameSlots` (server wins per table; a local table is dropped only when the server
+closed it, confirmed it earlier and no longer has it, or it was discarded/left here); realtime writes
+one table via `replaceGameSlot` (only an existing slot, keeps that table's own paid marks via
+`mergeIncomingSlot`). Always `syncCurrentGameMirror` **before** `normalize` after a merge, or
+`migrateGamesArray` resurrects a removed table from the stale singular fields. One realtime channel
+per open table (`cloudGameChannels`, cap 4, current first) plus an account-wide channel
+(`CLOUD_ACCOUNT_TABLES`) that turns any games/groups/members/friendships/debts change into a debounced pull.
+
+**Delete vs leave (v96–97).** The corner button is "מחק שולחן" (bin; red + "הנתונים מהשולחן לא ירשמו"
+on the first tap) for the opener — deletes on the server (`games_delete_creator`) — and "עזוב שולחן"
+(door) for anyone else: `state.leftGameIds` hides it on this device, pruned once it closes. Closing
+with a settlement stays open to everyone seated.
+
+**Sync robustness.** A row the server refuses for what it contains (42501/23xxx/22P02, row identified —
+`cloudNameRefusedRow` probes batches, a batch of one names its row) is quarantined in memory
+(`cloudQuarantine`) and the push re-runs without it and its children; released on boot, dot tap,
+online/foreground, or an edit of the row. Known rows are written with a plain `.update()`, never an
+upsert (ON CONFLICT is checked against the INSERT policy, which forbids `phase = 'closed'`). Pending
+ids come only from rows this device writes (`buildCloudRows`), and a pull settles ids the server holds
+identically. Debts are exempt from the frozen-game filter so a debt that failed after its close is
+retried. **Tap the sync dot** for state, refused table/code/row, pending ids, and a `vp … vNN` line
+(viewport + running version) — ask the owner for that screenshot before guessing.
+
+**Fresh start (2026-10-05).** `DATA_EPOCH = 1`: any stored document from before is replaced by an
+empty one on load (UI prefs kept). Paired with `fresh-start-2026-10-05.sql`. Bump only together with
+another server wipe.
+
+**Push notifications (v92–93; plan `docs/superpowers/plans/2026-10-05-push-notifications.md`, revised
+after `.superpowers/codex-plans-review.md`).** Server-side outbox: triggers on games/debts/friendships
+write `notification_events`; `app_wake_notifier()` pg_net-POSTs the `notify` Edge Function with a
+Vault-generated secret (`x-notify-secret`); the function (`supabase/functions/notify/index.ts`,
+deployed from the dashboard with **Verify JWT off**) drains the outbox with `npm:web-push`. Function
+secrets `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` live only in Supabase (the public key
+is also `VAPID_PUBLIC` in the client). Client: settings row "התראות" + test send, a one-time
+"לקבל התראות?" popup (`state.pushPromptDismissed`), `sw.js` push/notificationclick. iOS needs the
+app installed to the home screen.
+
+**Email sign-in (2026-10-06).** Custom SMTP via Resend (`smtp.resend.com:465`, user `resend`,
+sender `kupa@dvirazria.co.il` "סוגרים קופה"; the domain is shared with OwnerGuard, its own API key).
+The "Magic link or OTP" and "Confirm sign up" templates are Hebrew and show `{{ .Token }}`. The
+project's Email OTP length is **8** — the client's `AUTH_CODE_LENGTH` must match (manual entry
+accepts 6–10).
 
 ## Backend — applied to production (2026-09-10)
 
@@ -535,6 +584,8 @@ on Supabase; a SECURITY DEFINER function pinned to `search_path = public` cannot
 published set -- add a table to both, publication first.
 Each was verified live afterwards with an anonymous `curl` (every SECURITY DEFINER function and view must
 answer `401 permission denied`, never 200/404), and `node tools/rls-probe.mjs` reports 0 findings.
-Google OAuth consent screen is **In production**. Version 65 ships `state.games` as the authoritative
-store (multi-game Round 1); Round 2 (route, dashboard, cloud, realtime) is planned in
-`docs/superpowers/plans/2026-09-10-multi-game.md`.
+Google OAuth consent screen is **In production**.
+Later: `push-notifications.sql` (2026-10-05; outbox, triggers, Vault secret `notify_secret`) and
+`invites-any-member.sql` (2026-10-06; revised first to keep the admin-only guest-binding guard).
+Dashboard-only configuration (not in SQL files): Edge Function `notify` + its three VAPID secrets,
+Auth custom SMTP (Resend), the two Hebrew email templates.
