@@ -113,3 +113,16 @@ test("one realtime channel per open table: current first, cloud ids only, at mos
   assert.deepEqual(ids, [u(5), u(1), u(2), u(3)]);
   assert.deepEqual(JSON.parse(vm.runInContext("JSON.stringify(cloudChannelGameIds({ example: true, games: [] }))", c3)), []);
 });
+
+test("the corner button: the opener deletes the table for everyone, anyone else leaves it for good (2026-10-06)", () => {
+  const handler = html.slice(html.indexOf('function resetCornerLabel()'), html.indexOf('// ---------- group settings overlay: UI-only state'));
+  assert.match(handler, /isGameOpener\(state\.gameId\) \? "מחק שולחן" : "עזוב שולחן"/);
+  assert.match(handler, /if \(isGameOpener\(gameId\)\) \{\s*discardCloudGame\(gameId\);/);
+  assert.match(handler, /state\.leftGameIds = \[\.\.\.\(state\.leftGameIds \|\| \[\]\)\.filter\(id => id !== gameId\), gameId\]\.slice\(-50\);/);
+  // a left table never comes back through a pull, and is forgotten once it closes
+  assert.match(html, /discarded: new Set\(\[\.\.\.cloudDiscardedGameIds, \.\.\.\(state\.leftGameIds \|\| \[\]\)\]\)/);
+  assert.match(html, /state\.leftGameIds = state\.leftGameIds\.filter\(id => stillOpen\.has\(String\(id\)\)\);/);
+  assert.match(html, /leftGameIds: Array\.isArray\(s\.leftGameIds\) \? s\.leftGameIds\.map\(String\)\.slice\(-50\) : \[\],/);
+  // offline, or never on the server: the table is this device's own
+  assert.match(fn("isGameOpener"), /if \(!cloudMode\(\) \|\| !cloudKnownGameIds\(\)\.has\(id\)\) return true;/);
+});

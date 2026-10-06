@@ -1297,7 +1297,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 95</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 96</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -1753,6 +1753,9 @@
       iosInstallHintDismissed: !!s.iosInstallHintDismissed,
       // "לא עכשיו" on the notifications prompt: never ask again on this device (settings still can).
       pushPromptDismissed: !!s.pushPromptDismissed,
+      // Tables this person left ("עזוב שולחן"): never shown on this device again while they stay
+      // open on the server; pruned once they close. Capped so it can never grow without bound.
+      leftGameIds: Array.isArray(s.leftGameIds) ? s.leftGameIds.map(String).slice(-50) : [],
       gameId,
       history: Array.isArray(s.history) ? s.history : [],
       debts: Array.isArray(s.debts) ? s.debts.map(normalizeDebt).filter(Boolean) : [],
@@ -2155,6 +2158,14 @@
   // the session and, when it ever reached the server, delete it there (games_delete_creator:
   // only its creator, only while open -- the children cascade). For anyone else the delete
   // affects no rows: somebody else's table carries on, and returns here on the next app start.
+  // Whoever opened a table may delete it. Offline, or a table that never reached the server, is
+  // this device's own; otherwise the server's created_by decides.
+  function isGameOpener(gameId) {
+    const id = String(gameId || "");
+    if (!cloudMode() || !cloudKnownGameIds().has(id)) return true;
+    const creator = cloudGameCreators[id];
+    return !creator || creator === authUser.id;
+  }
   function discardCloudGame(gameId) {
     if (!supabase) return;
     const id = String(gameId || "");
@@ -2816,7 +2827,8 @@
     const confirmedOnServer = new Set(((lastPushedRows || EMPTY_CLOUD_ROWS).games || []).map(row => String(row.id)));
     const mergedGames = gamesHeld || (state.example && !openCandidates.length) ? undefined
       : mergeOpenGameSlots(state.example ? [] : state.games, openCandidates,
-        { closedOnServer, confirmedOnServer, closedHere, discarded: cloudDiscardedGameIds });
+        { closedOnServer, confirmedOnServer, closedHere,
+          discarded: new Set([...cloudDiscardedGameIds, ...(state.leftGameIds || [])]) });
     const transfersByGame = {};
     (payload.transfers || []).forEach(row => {
       if (row && row.id) transfersByGame[String(row.id)] = String(row.settlement_key || "");
@@ -2890,6 +2902,11 @@
     // The baseline is what the SERVER holds, not what we now hold: a record the merge kept is
     // absent from it and goes up on the next push (that is the first-device seeding rule).
     lastPushedRows = serverBaseline;
+    // A left table that is no longer open on the server needs no remembering.
+    if (!gamesHeld && (state.leftGameIds || []).length) {
+      const stillOpen = new Set((payload.openGames || []).map(row => String(row && row.id)));
+      state.leftGameIds = state.leftGameIds.filter(id => stillOpen.has(String(id)));
+    }
     // A pending id only ever cleared on a push that confirmed it. A record that arrived by pull (a
     // friendship somebody else's phone created) was marked pending by the next save and then sat
     // there forever -- identical on both sides, so no push ever had a reason to run. Anything the
@@ -7980,6 +7997,11 @@
     // settings) in its header, and game/settle keep the reset control in that corner.
     document.getElementById("settingsBtn").hidden = appView !== "profile" && appView !== "games" && appView !== "friends";
     document.getElementById("resetBtn").hidden = appView === "profile" || appView === "friends" || appView === "games" || appView === "group";
+    if (!resetArmed) {
+      const cornerLabel = resetCornerLabel();
+      document.getElementById("resetLabel").textContent = cornerLabel;
+      document.getElementById("resetBtn").setAttribute("aria-label", cornerLabel);
+    }
     document.getElementById("gamesHome").hidden = appView !== "games" && appView !== "group";
     document.getElementById("friendsPage").hidden = appView !== "friends";
 
@@ -9701,6 +9723,11 @@
   // confirm() is blocked in the artifact sandbox; the two-step arm/confirm
   // pattern works everywhere, so it is the deliberate choice on all builds.
   let resetArmed = null;
+  // The corner button means two different things (owner's rule, 2026-10-06): whoever opened the
+  // table deletes it -- for everyone, no history; anybody else only leaves it -- it disappears from
+  // this device for good, while the table, and this person's money in it, carry on for the rest.
+  // Closing with a settlement stays open to everyone seated, as before.
+  function resetCornerLabel() { return isGameOpener(state.gameId) ? "מחק שולחן" : "עזוב שולחן"; }
   document.getElementById("resetBtn").addEventListener("click", (e) => {
     const btn = e.currentTarget;
     const label = document.getElementById("resetLabel");
@@ -9710,15 +9737,20 @@
       resetArmed = setTimeout(() => {
         resetArmed = null;
         btn.classList.remove("danger-armed");
-        label.textContent = "איפוס";
+        label.textContent = resetCornerLabel();
       }, 4000);
       return;
     }
     clearTimeout(resetArmed);
     resetArmed = null;
     btn.classList.remove("danger-armed");
-    label.textContent = "איפוס";
-    discardCloudGame(state.gameId); // reset ends this table on the server too, not just here
+    const gameId = String(state.gameId || "");
+    if (isGameOpener(gameId)) {
+      discardCloudGame(gameId); // the opener ends this table on the server too, not just here
+    } else {
+      state.leftGameIds = [...(state.leftGameIds || []).filter(id => id !== gameId), gameId].slice(-50);
+    }
+    label.textContent = resetCornerLabel();
     state = newCurrentGame(state, { phase: "closed" });
     expandedEntries.clear();
     openMenu = null; customOpen = null;
