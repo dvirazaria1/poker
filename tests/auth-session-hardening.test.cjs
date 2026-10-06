@@ -46,6 +46,9 @@ function makeEnv(overrides = {}) {
     exitCloudMode() { calls.exitCloud++; },
     showLogin() { calls.showLogin++; },
     refreshInviteNotices() { calls.inviteRefresh++; },
+    // the 15s profile deadline must not keep the test process alive
+    setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms); if (timer.unref) timer.unref(); return timer; },
+    clearTimeout,
   });
   vm.runInContext(authSource, context);
   const get = (code) => vm.runInContext(code, context);
@@ -129,4 +132,16 @@ test('resend is single-flight, and a stored OAuth error is shown even when a loc
   assert.match(boot, /if \(authRedirectError\) \{[\s\S]*?showLogin\(\);\s*\} else if \(friendToken\)/);
   assert.match(html, /window\.addEventListener\("pageshow", resetGoogleBusy\)/);
   assert.match(html, /document\.addEventListener\("visibilitychange", \(\) => \{ if \(!document\.hidden\) resetGoogleBusy\(\); \}\)/);
+});
+
+test("a hung profile request gives up after 15s and shows the retry line instead of spinning forever", () => {
+  assert.match(authSource, /const AUTH_PROFILE_TIMEOUT_MS = 15000;/);
+  assert.match(authSource, /const profile = await Promise\.race\(\[\s*ensureProfile\(user\),\s*new Promise\(resolve => setTimeout\(\(\) => resolve\(null\), AUTH_PROFILE_TIMEOUT_MS\)\),\s*\]\);/);
+});
+
+test("'לא עכשיו' on a friend invite before signing in keeps the invite for after sign-in", () => {
+  const html = require("node:fs").readFileSync("kupa-sgura.html", "utf8");
+  const show = html.slice(html.indexOf("  function showFriendNotice(token) {"), html.indexOf("  function maybeRunPendingFriendInvite()"));
+  assert.match(show, /ui\.laterBtn\.addEventListener\("click", \(\) => \{\s*if \(cloudMode\(\)\) \{ closeFriendNotice\(\); return; \}\s*friendNoticeParts\(\)\.notice\.hidden = true;/);
+  assert.doesNotMatch(show, /ui\.laterBtn\.addEventListener\("click", closeFriendNotice\)/);
 });

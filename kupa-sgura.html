@@ -1304,7 +1304,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 99</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 100</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -8738,6 +8738,7 @@
   // data moves to the server yet — save()/initSync()/remoteBody() are untouched, and nothing here
   // invents a `userId` on a participant ref (that is phase 2).
   let authUser = null;          // null | { id, email, displayName, app_metadata, identities }
+  const AUTH_PROFILE_TIMEOUT_MS = 15000;
   let authAppliedUserId = null; // last session whose profile was ensured (set only after success) — avoids double upserts
   let authPendingUserId = null; // session whose profile request is in flight — same-user events wait for it
   let authProfileFailedUserId = null; // session whose profile could not be ensured; shows the retry line
@@ -8834,7 +8835,12 @@
     }
     const gen = ++authSessionGen;
     authPendingUserId = user.id;
-    const profile = await ensureProfile(user);
+    // A hung profile request must not leave sign-in spinning forever: after 15s it counts as a
+    // failure, which shows the "נסו שוב" line; a late answer is simply not waited for.
+    const profile = await Promise.race([
+      ensureProfile(user),
+      new Promise(resolve => setTimeout(() => resolve(null), AUTH_PROFILE_TIMEOUT_MS)),
+    ]);
     if (gen !== authSessionGen) return; // signed out or switched account while we waited
     authPendingUserId = null;
     if (!profile) { // authenticated but no usable profile: stay out of cloud mode until a retry works
@@ -10719,7 +10725,14 @@
         if (cloudMode()) { acceptFriendInvite(token2); return; }
         if (supabase) { friendNoticeParts().notice.hidden = true; showLogin(); }
       });
-      ui.laterBtn.addEventListener("click", closeFriendNotice);
+      // "לא עכשיו" before signing in only puts the notice away: the invite is kept (memory + URL)
+      // and comes back after sign-in (maybeRunPendingFriendInvite). Signed in, it declines it.
+      ui.laterBtn.addEventListener("click", () => {
+        if (cloudMode()) { closeFriendNotice(); return; }
+        friendNoticeParts().notice.hidden = true;
+        const joinToken = parseJoinToken(location.search);
+        if (joinToken) { pendingJoinToken = joinToken; showJoinNotice(joinToken, false); }
+      });
     }
     if (!supabase) {
       ui.status.textContent = "קישור חברים דורש חיבור לחשבון";
