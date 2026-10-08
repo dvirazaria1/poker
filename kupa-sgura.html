@@ -552,43 +552,18 @@
   }
   .games-group-stats-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .games-group-tabs .games-group-action { flex: 1 1 0; }
-  /* ---- Open-card motion (2026-10-08). One rule: content moves the way its screen opened.
-     Statistics unfold leftwards out of their tile, so their content travels right-to-left and
-     "חזור" plays it back left-to-right; settings open from the top, so their content drops.
-     Nothing re-renders mid-motion: swapGroupCardBody draws the new state at once, lays a
-     short-lived clone of the old part over it (.games-group-ghost) to play the exit, and eases
-     the body's height between the two sizes. Strictly in sequence (owner, 2026-10-08: the two
-     must never show at once): every exit is over by 120ms and every entrance waits for it. */
-  .games-group-ghost { position: absolute; left: 0; right: 0; z-index: 1; pointer-events: none; }
-  .games-group-ghost > :first-child { margin-top: 0 !important; }
-  @keyframes fadeOut { to { opacity: 0; } }
-  @keyframes groupTabUnfold {
-    from { opacity: 0; transform: translateX(var(--unfold-from, 60px)) scale(.85); }
-    to { opacity: 1; transform: none; }
-  }
-  @keyframes groupTabFold { to { opacity: 0; transform: translateX(var(--unfold-from, 60px)) scale(.85); } }
-  @keyframes groupGhostLeft { to { opacity: 0; transform: translateX(-18px); } }
-  @keyframes groupGhostRight { to { opacity: 0; transform: translateX(18px); } }
-  @keyframes groupGhostDown { to { opacity: 0; transform: translateY(16px); } }
-  @keyframes cardSlideIn { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
-  .games-group-tabs.unfold .games-group-action, .games-group-ghost.ghost-fold .games-group-action { --unfold-from: 74px; }
-  .games-group-tabs.unfold .games-group-action:nth-child(3), .games-group-ghost.ghost-fold .games-group-action:nth-child(3) { --unfold-from: 148px; }
-  .games-group-tabs.unfold .games-group-action:nth-child(4), .games-group-ghost.ghost-fold .games-group-action:nth-child(4) { --unfold-from: 222px; }
-  .games-group-tabs.unfold .games-group-action { animation: groupTabUnfold .3s cubic-bezier(.2, .8, .2, 1) .12s both; }
-  .games-group-tabs.unfold .games-group-action:nth-child(3) { animation-delay: .16s; }
-  .games-group-tabs.unfold .games-group-action:nth-child(4) { animation-delay: .2s; }
-  .games-group-ghost.ghost-fold .games-group-action { animation: groupTabFold .22s cubic-bezier(.4, 0, .2, 1) both; }
-  .games-group-ghost.ghost-fold .games-group-stats-btn, .games-group-ghost.ghost-unfold .games-group-stats-btn { background: transparent; }
-  .games-group-ghost.ghost-fold .games-group-stats-btn > *, .games-group-ghost.ghost-unfold .games-group-stats-btn > * { animation: fadeOut .1s ease both; }
-  .games-group-ghost.ghost-unfold .games-group-table-btn { animation: groupGhostLeft .12s ease both; }
-  .games-group-tabs.unfold .games-group-stats-btn > * { animation: fadeIn .18s ease .12s both; }
-  .games-group-main-actions.fold .games-group-stats-btn > * { animation: fadeIn .18s ease .2s both; }
-  .games-group-main-actions.fold .games-group-table-btn { animation: fadeIn .2s ease .22s both; }
-  .games-group-main-actions.fold ~ :not(.games-group-ghost) { animation: fadeIn .22s ease .12s both; }
-  .games-group-ghost.ghost-left { animation: groupGhostLeft .12s ease both; }
-  .games-group-ghost.ghost-right { animation: groupGhostRight .12s ease both; }
-  .games-group-ghost.ghost-down { animation: groupGhostDown .12s ease both; }
-  .games-group-view.slide { animation: cardSlideIn .26s cubic-bezier(.2, .8, .2, 1) .12s both; }
+  .games-group-row-rest { flex: 1 1 auto; min-width: 0; display: flex; gap: 8px; }
+  .games-group-main-actions > .games-page-clip { flex: 1 1 auto; min-width: 0; }
+  /* ---- Open-card page turn (2026-10-08, rebuilt from scratch). A mode or tab change is a page
+     turn: the old page and the new one sit side by side in a clipped track and move together --
+     statistics sideways (opening travels leftwards, "חזור" rightwards), settings vertically
+     (opening drops down, closing goes back up) -- while the clip eases to the new page's height.
+     Nothing fades and nothing is ever drawn over anything else (turnGroupCardPage). */
+  .games-page-clip { overflow: hidden; }
+  .games-page-track { display: flex; align-items: flex-start; direction: ltr; will-change: transform; }
+  .games-page-track.y { flex-direction: column; align-items: stretch; }
+  .games-page { flex: 0 0 100%; min-width: 0; direction: rtl; display: flow-root; }
+  .games-page-track.y .games-page { flex: 0 0 auto; }
   .games-group-players .games-group-join { width: 100%; color: var(--accent); font-weight: 600; text-align: start; border-bottom: 1px solid var(--line); }
   .games-group-join-plus { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
   .games-group-player-meta { color: var(--dim); font-size: 12px; font-weight: 300; }
@@ -599,12 +574,6 @@
   @keyframes gearSpinOut { from { transform: rotate(180deg); } to { transform: none; } }
   .games-group-gear.spin-in svg { animation: gearSpinIn .55s cubic-bezier(.2, .8, .2, 1) both; }
   .games-group-gear.spin-out svg { animation: gearSpinOut .55s cubic-bezier(.2, .8, .2, 1) both; }
-  /* Settings come down from the top of the card (the body clips, so it reads as a pull-down). */
-  @keyframes cardDropIn { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: none; } }
-  /* The new content drops in child by child, never the content box itself: the exit ghost lives in
-     that box too and must stay fully visible while it leaves. */
-  .games-group-body-content.drop-in > :not(.games-group-ghost) { animation: cardDropIn .28s cubic-bezier(.2, .8, .2, 1) .12s both; }
-  .games-group-view.drop { animation: cardDropIn .26s cubic-bezier(.2, .8, .2, 1) .12s both; }
   .games-group-gear svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .games-group-view { margin-top: 12px; }
   .games-group-view.centered { text-align: center; }
@@ -1602,7 +1571,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 112</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 115</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -1883,8 +1852,7 @@
   let expandedGroupMode = "main";   // "main" | "details" | "settings" -- what the open card shows
   let expandedGroupTab = "";        // the selected tile inside details/settings
   let groupCardArmed = "";          // archive/delete/leave armed for a second tap
-  let groupCardMotion = "";         // "unfold" (into statistics) / "fold" (back) -- plays once
-  let groupCardViewEnter = "";      // "slide" / "drop": the next rendered view animates in, once
+  let groupCardMotion = "";         // "settings-in" / "settings-out": the gear spins once
   let groupCardArmedTimeout = null;
   const expandedGroupGames = new Set();
   let state = load();
@@ -7194,10 +7162,7 @@
     const bodyIn = el("div", "games-group-body-in");
     const content = el("div", "games-group-body-content");
     if (expanded) {
-      if (groupCardMotion === "settings-in" || groupCardMotion === "settings-out") {
-        content.classList.add("drop-in");
-        groupCardMotion = "";
-      }
+      groupCardMotion = ""; // the gear (rendered just above) has taken its spin
       if (expandedGroupMode === "details") renderGroupCardDetails(content, group);
       else if (expandedGroupMode === "settings" && group.isMember) renderGroupCardSettings(content, group);
       else renderGroupCardMain(content, group);
@@ -7219,72 +7184,94 @@
     expandedGroupTab = tab || "";
     disarmGroupCardAction();
     resetStartGamePanel();
-    swapGroupCardBody(groupCardModeExits(from, mode));
-  }
-  // Which parts of the old body leave, and how, when the open card changes mode. The first child
-  // of the body is always its top row; "rest" is everything under it.
-  function groupCardModeExits(from, to) {
-    if (from === "main" && to === "details") return [{ take: "row", motion: "ghost-unfold" }, { take: "rest", motion: "ghost-left" }];
-    if (from === "details" && to === "main") return [{ take: "row", motion: "ghost-fold" }, { take: "rest", motion: "ghost-right" }];
-    return [{ take: "all", motion: "ghost-down" }];
+    if (from === "settings" || mode === "settings") {
+      turnGroupCardPage([".games-group-body-content"], { axis: "y", forward: mode === "settings" });
+    } else {
+      // The "סטטיסטיקות"/"חזור" tile stays under the thumb; the rest of its row and everything
+      // below it turn together (opening leftwards, closing rightwards).
+      turnGroupCardPage([".games-group-row-rest", ".games-group-below"], { axis: "x", forward: mode === "details" });
+    }
   }
   function setGroupCardTab(tab) {
     const current = expandedGroupTab || (expandedGroupMode === "settings" ? "details" : "games");
     if (tab === current) return;
     expandedGroupTab = tab;
     disarmGroupCardAction();
-    const settings = expandedGroupMode === "settings";
-    groupCardViewEnter = settings ? "drop" : "slide";
-    swapGroupCardBody([{ take: "rest", motion: settings ? "ghost-down" : "ghost-left" }]);
+    if (expandedGroupMode === "settings") {
+      // Settings tabs (owner, 2026-10-08): the new view comes in from the side its tab is on. In
+      // RTL the earlier tab sits to the right, so a tab to the right of the current one is
+      // "forward" (enters from the right), one to its left enters from the left.
+      const order = ["details", "invite", "roles"];
+      turnGroupCardPage([".games-group-view"], { axis: "x", forward: order.indexOf(tab) < order.indexOf(current) });
+    } else {
+      // Statistics tabs keep moving the way statistics opened (leftwards).
+      turnGroupCardPage([".games-group-view"], { axis: "x", forward: true });
+    }
   }
 
-  // Re-renders the dashboard for a change inside the open card without a hard cut: the new state
-  // is drawn at once, each exit clones the part of the old body it names into a
-  // .games-group-ghost that plays its exit over the new content (then removes itself), and the
-  // body's height eases from the old size to the new one. Reduced motion: a plain re-render.
-  function swapGroupCardBody(exits) {
+  // Re-renders the dashboard and turns each region of the open card named in `selectors` (the
+  // whole body, the rest of the top row, the content under it, or just a view) from its old page
+  // to its new one. Each region gets a clipped track holding both pages: forward on "x" puts the
+  // new page to the right and slides everything left, backward is the mirror image; forward on
+  // "y" puts the new page above and slides everything down, backward slides up. The clip's height
+  // runs from the old page's to the new page's, then the new page is put back in place.
+  // Reduced motion, or a region missing on either side: a plain re-render.
+  // fill "forwards" holds the last frame until the page is swapped back in -- no flash between.
+  const GROUP_PAGE_TURN = { duration: 340, easing: "cubic-bezier(.32, .72, 0, 1)", fill: "forwards" };
+  function turnGroupCardPage(selectors, turn) {
     const reduce = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const oldContent = document.querySelector(".games-group-card.expanded .games-group-body-content");
-    if (reduce || !oldContent || !oldContent.firstElementChild) { renderGamesDashboard(); return; }
-    const oldBody = oldContent.closest(".games-group-body");
-    const fromHeight = oldBody ? oldBody.getBoundingClientRect().height : 0;
-    const children = Array.from(oldContent.children);
-    const ghosts = [];
-    (exits || []).forEach(exit => {
-      const parts = exit.take === "row" ? children.slice(0, 1) : exit.take === "rest" ? children.slice(1) : children;
-      if (!parts.length) return;
-      const wrap = document.createElement("div");
-      wrap.className = "games-group-ghost " + exit.motion;
-      wrap.setAttribute("aria-hidden", "true");
-      wrap.setAttribute("inert", "");
-      wrap.style.top = parts[0].offsetTop + "px";
-      parts.forEach(part => {
-        const clone = part.cloneNode(true);
-        // The clone must only play its exit, never the entrance its original was drawn with.
-        [clone].concat(Array.from(clone.querySelectorAll("*"))).forEach(node => {
-          if (node.classList) node.classList.remove("unfold", "fold", "slide", "drop", "drop-in", "anim");
-          if (node.removeAttribute) node.removeAttribute("id");
-        });
-        wrap.appendChild(clone);
-      });
-      ghosts.push(wrap);
-    });
+    const findPage = (selector) => {
+      const body = document.querySelector(".games-group-card.expanded .games-group-body");
+      return body ? body.querySelector(selector + ":not(.games-page-leaving)") : null;
+    };
+    const oldPages = selectors.map(findPage);
+    if (reduce || oldPages.some(p => !p || typeof p.animate !== "function")) { renderGamesDashboard(); return; }
+    oldPages.forEach(p => p.classList.add("games-page-leaving"));
     renderGamesDashboard();
-    const content = document.querySelector(".games-group-card.expanded .games-group-body-content");
-    if (!content) return;
-    ghosts.forEach(wrap => {
-      content.appendChild(wrap);
-      setTimeout(() => wrap.remove(), 420);
+    selectors.forEach((selector, i) => {
+      const newPage = findPage(selector);
+      if (newPage && newPage.parentNode) slideGroupCardPages(oldPages[i], newPage, turn);
     });
-    const body = content.closest(".games-group-body");
-    if (!body || !fromHeight) return;
-    const toHeight = body.getBoundingClientRect().height;
-    if (Math.abs(toHeight - fromHeight) < 1) return;
-    body.style.height = fromHeight + "px";
-    body.getBoundingClientRect(); // commit the start height before the transition target
-    body.style.transition = "height .28s cubic-bezier(.2, .8, .2, 1)";
-    body.style.height = toHeight + "px";
-    setTimeout(() => { body.style.height = ""; body.style.transition = ""; }, 320);
+  }
+  function slideGroupCardPages(oldPage, newPage, turn) {
+    const clip = el("div", "games-page-clip");
+    const track = el("div", "games-page-track" + (turn.axis === "y" ? " y" : ""));
+    const leaving = el("div", "games-page");
+    leaving.setAttribute("aria-hidden", "true");
+    leaving.setAttribute("inert", "");
+    leaving.appendChild(oldPage);
+    const arriving = el("div", "games-page");
+    newPage.parentNode.insertBefore(clip, newPage);
+    arriving.appendChild(newPage);
+    const newFirst = turn.axis === "y" ? turn.forward : !turn.forward;
+    if (newFirst) track.append(arriving, leaving); else track.append(leaving, arriving);
+    clip.appendChild(track);
+
+    const fromHeight = leaving.offsetHeight;
+    const toHeight = arriving.offsetHeight;
+    let fromMove, toMove;
+    if (turn.axis === "y") {
+      fromMove = turn.forward ? "translateY(" + (-toHeight) + "px)" : "translateY(0)";
+      toMove = turn.forward ? "translateY(0)" : "translateY(" + (-fromHeight) + "px)";
+    } else {
+      fromMove = turn.forward ? "translateX(0)" : "translateX(-100%)";
+      toMove = turn.forward ? "translateX(-100%)" : "translateX(0)";
+    }
+    const motions = [
+      track.animate([{ transform: fromMove }, { transform: toMove }], GROUP_PAGE_TURN),
+      clip.animate([{ height: fromHeight + "px" }, { height: toHeight + "px" }], GROUP_PAGE_TURN),
+    ];
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      if (!clip.isConnected) return; // a later re-render already replaced the card
+      clip.parentNode.insertBefore(newPage, clip);
+      clip.remove();
+    };
+    motions[0].finished.then(settle, settle);
+    // Backstop for a page that is hidden mid-turn (its timeline stops): land on the new page.
+    setTimeout(() => { motions.forEach(m => { try { m.finish(); } catch (e) {} }); settle(); }, GROUP_PAGE_TURN.duration + 400);
   }
   // A row of square tiles; the one whose key matches `current` reads as selected.
   function groupTileRow(tiles, current) {
@@ -7335,14 +7322,17 @@
     const stats = el("button", "games-group-stats-btn");
     stats.type = "button";
     stats.innerHTML = GROUP_ACTION_ICONS.details + "<span>סטטיסטיקות</span>";
-    stats.addEventListener("click", () => { groupCardMotion = "unfold"; groupCardViewEnter = "slide"; setGroupCardMode("details", "games"); });
-    // 2026-10-08: "סטטיסטיקות" sits on the start (right) side; tapping it turns it into "חזור"
-    // in place while the statistics tabs unfold to its left over where "התחל משחק" was.
-    row.append(stats, table);
-    if (groupCardMotion === "fold") { row.classList.add("fold"); groupCardMotion = ""; }
+    stats.addEventListener("click", () => setGroupCardMode("details", "games"));
+    // 2026-10-08: "סטטיסטיקות" sits on the start (right) side and never moves: in statistics the
+    // same tile reads "חזור", and only what is to its left (.games-group-row-rest) and under the
+    // row (.games-group-below) turn like a page.
+    const rest = el("div", "games-group-row-rest");
+    rest.appendChild(table);
+    row.append(stats, rest);
     content.appendChild(row);
-    if (reason) content.appendChild(el("p", "games-group-action-reason", reason));
-    if (pickerOpen) content.appendChild(renderStartGamePanel());
+    const below = el("div", "games-group-below");
+    if (reason) below.appendChild(el("p", "games-group-action-reason", reason));
+    if (pickerOpen) below.appendChild(renderStartGamePanel());
 
     const players = el("div", "games-group-players");
     const archived = isGroupArchived(groupId);
@@ -7361,7 +7351,8 @@
       players.appendChild(rowEl);
     });
     if (!members.length) players.appendChild(el("p", "games-empty", "אין חברים פעילים"));
-    content.appendChild(players);
+    below.appendChild(players);
+    content.appendChild(below);
   }
 
   // Details mode: the same card, the tiles become back / games / ranking / stats and the member
@@ -7375,10 +7366,8 @@
     const back = el("button", "games-group-stats-btn");
     back.type = "button";
     back.innerHTML = GROUP_ACTION_ICONS.back + "<span>חזור</span>";
-    // Closing plays the opening backwards in one movement: the main row is drawn at once while
-    // a clone of these tabs folds rightwards into this tile (see swapGroupCardBody).
-    back.addEventListener("click", () => { groupCardMotion = "fold"; setGroupCardMode("main"); });
-    row.appendChild(back);
+    back.addEventListener("click", () => setGroupCardMode("main"));
+    const rest = el("div", "games-group-row-rest");
     [
       { key: "games", icon: "history", label: "משחקים" },
       { key: "ranking", icon: "trophy", label: "דירוג" },
@@ -7386,14 +7375,13 @@
     ].forEach(t => {
       const btn = groupActionButton(t.icon, t.label, () => setGroupCardTab(t.key), t.key === tab ? "on" : "");
       btn.setAttribute("aria-pressed", String(t.key === tab));
-      row.appendChild(btn);
+      rest.appendChild(btn);
     });
-    if (groupCardMotion === "unfold") { row.classList.add("unfold"); groupCardMotion = ""; }
+    row.append(back, rest);
     content.appendChild(row);
     const collections = collectionsOf(state);
     const games = resolveGroupGameSummaries(collections, groupId, cloudGroupAggregates);
-    const view = el("div", "games-group-view" + (groupCardViewEnter === "slide" ? " slide" : ""));
-    groupCardViewEnter = "";
+    const view = el("div", "games-group-view");
     if (!games.length) {
       view.appendChild(el("p", "games-empty", "עוד אין משחקים בקבוצה"));
     } else if (tab === "ranking") {
@@ -7403,7 +7391,9 @@
     } else {
       renderGroupCardTimeline(view, games);
     }
-    content.appendChild(view);
+    const below = el("div", "games-group-below");
+    below.appendChild(view);
+    content.appendChild(below);
   }
   function renderGroupCardTimeline(view, games) {
     const list = el("div", "games-group-timeline");
@@ -7673,8 +7663,7 @@
     ];
     tiles.push({ key: "roles", icon: "shield", label: "ניהול", onClick: () => setGroupCardTab("roles") });
     content.appendChild(groupTileRow(tiles, tab));
-    const view = el("div", "games-group-view" + (groupCardViewEnter === "drop" ? " drop" : "") + (tab === "invite" ? " centered" : ""));
-    groupCardViewEnter = "";
+    const view = el("div", "games-group-view" + (tab === "invite" ? " centered" : ""));
     if (tab === "invite") {
       const invite = renderGroupInvite(group, activeInvite(state.invites, groupId), group.isAdmin);
       if (invite) view.appendChild(invite);
