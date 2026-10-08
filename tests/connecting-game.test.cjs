@@ -98,3 +98,8 @@ test('a five-card board dealt like a casino: the flop leaves the deck as one sta
   // no seat markers any more: the hole cards are the players
   assert.doesNotMatch(html, /deal-seat/);
 });
+
+test('on the friends screen the hand sits 25px lower than elsewhere (owner, 2026-10-08)', () => {
+  assert.match(html, /\.connecting\.full \{ margin-top: 18px; \}/);
+  assert.match(html, /\.friends-empty \.connecting\.full \{ margin-top: 43px; \}/);
+});

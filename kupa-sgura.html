@@ -958,6 +958,8 @@
      The cards move by Web Animations; reduced motion gets a still table from the JS. */
   .connecting { display: flex; flex-direction: column; align-items: center; overflow: hidden; }
   .connecting.full { margin-top: 18px; }
+  /* Owner, 2026-10-08: on the friends screen the hand sits 25px lower, clear of the search link. */
+  .friends-empty .connecting.full { margin-top: 43px; }
   .connecting.mini { flex-direction: row; justify-content: center; gap: 10px; margin: 6px 0 4px; min-height: 30px; }
   .connecting-stage { position: relative; flex: 0 0 auto; }
   .connecting.full .connecting-stage { width: 236px; height: 104px; }
@@ -1705,7 +1707,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 126</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 127</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
