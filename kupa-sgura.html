@@ -1377,8 +1377,57 @@
   .pavatar.outline { background: var(--avatar-solid); border-color: var(--avatar-tint-edge); }
   .pavatar.outline .glyph-back { fill: var(--accent); stroke: var(--accent); stroke-width: 3.4; stroke-linejoin: round; }
   .pavatar.outline .glyph-front { fill: var(--avatar-solid); }
-  .pavatar.chip { background: var(--avatar-solid); border-style: dashed; border-color: var(--accent); }
-  .pavatar-chip-ring { position: absolute; inset: 16%; border-radius: 50%; border: 1px solid var(--avatar-tint-edge); }
+  .pavatar.solid { background: var(--accent-fill); border-color: var(--accent-fill); }
+  .pavatar.solid .glyph-back { fill: var(--bg); }
+  /* The four chips are physical objects, so they keep the same colours in both themes. Each is
+     built in layers like a clay casino chip: edge inserts over the whole disc, a face that covers
+     all but the rim, thin rings, an inlay that carries the suit, then a shine with a raised rim on
+     top. Insets are percentages, so one rule fits every size; .pc-detail drops out below 56px. */
+  :root {
+    --chip-black: #121619; --chip-white: #EEF5F5; --chip-turq: #2FD2CE;
+    --chip-accent: #35E0DC; --chip-teal: #0F7C79; --chip-inlay: #E7EFEF;
+  }
+  .pavatar.pchip { border: 1px solid rgba(127,140,145,.35); box-shadow: var(--card-shadow); }
+  .pchip > span { position: absolute; border-radius: 50%; box-sizing: border-box; }
+  .pchip .pc-ins, .pchip .pc-ins2, .pchip .pc-shine { inset: 0; }
+  .pchip .pc-face { box-shadow: 0 0 0 1px rgba(0,0,0,.22), inset 0 1px 2px rgba(255,255,255,.07); }
+  .pchip .pc-inlay { box-shadow: inset 0 1px 3px rgba(0,0,0,.38); }
+  .pchip .pc-shine {
+    pointer-events: none;
+    background: radial-gradient(circle at 32% 26%, rgba(255,255,255,.16), rgba(255,255,255,0) 52%);
+    box-shadow: inset 0 -2px 4px rgba(0,0,0,.35), inset 0 1px 2px rgba(255,255,255,.22);
+  }
+  .pchip.pc-small .pc-detail { display: none; }
+  .pchip .pc-mark { position: absolute; fill: rgba(234,244,244,.22); }
+  /* קזינו: black, eight white inserts, a turquoise racetrack, a light inlay */
+  .pavatar.chip-casino { background: var(--chip-black); }
+  .chip-casino .pc-ins { background: repeating-conic-gradient(from -7.5deg, var(--chip-white) 0deg 15deg, transparent 15deg 45deg); }
+  .chip-casino .pc-face { inset: 15%; background: var(--chip-black); }
+  .chip-casino .pc-race { inset: 20%; border: 1px solid var(--chip-accent); }
+  .chip-casino .pc-tick { inset: 23.5%; border: 1px dashed rgba(234,244,244,.28); }
+  .chip-casino .pc-inlay { inset: 27%; background: var(--chip-inlay); border: 1.5px solid var(--chip-accent); }
+  .chip-casino .glyph-back { fill: var(--chip-black); }
+  /* טורקיז: turquoise, six split white inserts, a black inlay */
+  .pavatar.chip-teal { background: var(--chip-turq); }
+  .chip-teal .pc-ins { background: repeating-conic-gradient(from -10deg, var(--chip-white) 0deg 20deg, transparent 20deg 60deg); }
+  .chip-teal .pc-ins2 { background: repeating-conic-gradient(from -1.1deg, var(--chip-turq) 0deg 2.2deg, transparent 2.2deg 60deg); }
+  .chip-teal .pc-face { inset: 15%; background: var(--chip-turq); }
+  .chip-teal .pc-race { inset: 19%; border: 1px solid rgba(5,7,10,.25); }
+  .chip-teal .pc-inlay { inset: 25%; background: var(--chip-black); border: 1.5px solid var(--chip-white); }
+  .chip-teal .glyph-back { fill: var(--chip-accent); }
+  /* מוטבע: black, twelve embossed suits around the face, a turquoise inlay */
+  .pavatar.chip-mold { background: var(--chip-black); }
+  .chip-mold .pc-ins { background: repeating-conic-gradient(from -12deg, var(--chip-accent) 0deg 24deg, transparent 24deg 90deg); }
+  .chip-mold .pc-face { inset: 14%; background: var(--chip-black); }
+  .chip-mold .pc-inlay { inset: 29%; background: var(--chip-accent); }
+  .chip-mold .glyph-back { fill: var(--chip-black); }
+  /* שלושה צבעים: turquoise, white and black inserts in turn, a white inlay */
+  .pavatar.chip-tricolor { background: var(--chip-turq); }
+  .chip-tricolor .pc-ins { background: repeating-conic-gradient(from -7deg, var(--chip-white) 0deg 14deg, transparent 14deg 45deg, var(--chip-black) 45deg 59deg, transparent 59deg 90deg); }
+  .chip-tricolor .pc-face { inset: 14%; background: var(--chip-turq); }
+  .chip-tricolor .pc-race { inset: 20%; border: 1px solid rgba(5,7,10,.3); }
+  .chip-tricolor .pc-inlay { inset: 25%; background: var(--chip-white); border: 2px solid var(--chip-black); }
+  .chip-tricolor .glyph-back { fill: var(--chip-teal); }
   .pavatar-card {
     position: absolute; box-sizing: border-box;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -1577,7 +1626,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 119</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 120</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -3705,15 +3754,17 @@
   // A profile picture is one of three things, kept as ONE string in profiles.avatar_url (and, for
   // this device, in the contact store) so the server needs no new column:
   //   a photo  -> a downscaled "data:image/jpeg;base64,..." (the client shrinks it first)
-  //   a suit   -> "kupa:suit:<spade|heart|diamond|club>:<plain|accent|outline|chip>"
+  //   a suit   -> "kupa:suit:<spade|heart|diamond|club>:<style>", style one of the plain shapes
+  //               (plain accent outline solid) or the chips (casino teal mold tricolor)
   //   cards    -> "kupa:cards:As" or "kupa:cards:As.Kh" (rank A K Q J 10 9..2, suit s h d c)
   // Anything else -- including another person's value that fails these exact shapes -- parses to
   // null and renders as the name's first letter, so a foreign string never reaches an <img src>.
   function parseAvatar(token) {
     if (typeof token !== "string" || !token || token.length > 32000) return null;
     if (/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(token)) return { kind: "photo", photo: token };
-    const suit = /^kupa:suit:(spade|heart|diamond|club):(plain|accent|outline|chip)$/.exec(token);
-    if (suit) return { kind: "suit", suit: suit[1], style: suit[2] };
+    const suit = /^kupa:suit:(spade|heart|diamond|club):(plain|accent|outline|solid|casino|teal|mold|tricolor|chip)$/.exec(token);
+    // "chip" was the single dashed chip of version 116-119; it now reads as the casino chip
+    if (suit) return { kind: "suit", suit: suit[1], style: suit[2] === "chip" ? "casino" : suit[2] };
     const card = "(?:A|K|Q|J|10|[2-9])[shdc]";
     const cards = new RegExp("^kupa:cards:(" + card + ")(?:\\.(" + card + "))?$").exec(token);
     if (!cards) return null;
@@ -10896,7 +10947,17 @@
   const AVATAR_SUIT_NAMES = { spade: "עלה", heart: "לב", diamond: "יהלום", club: "תלתן" };
   // U+FE0E keeps iOS from swapping the suit characters for colour emoji.
   const AVATAR_SUIT_GLYPHS = { spade: "♠︎", heart: "♥︎", diamond: "♦︎", club: "♣︎" };
-  const AVATAR_STYLES = [["plain", "נקי"], ["accent", "טורקיז"], ["outline", "קו"], ["chip", "צ׳יפ"]];
+  // the shape tab offers two rows of four: the shape on its own, then the shape on a chip
+  const AVATAR_SHAPE_STYLES = [["plain", "נקי"], ["accent", "טורקיז"], ["outline", "קו"], ["solid", "מלא"]];
+  const AVATAR_CHIP_STYLES = [["casino", "קזינו"], ["teal", "טורקיז"], ["mold", "מוטבע"], ["tricolor", "שלושה צבעים"]];
+  const AVATAR_STYLES = AVATAR_SHAPE_STYLES.concat(AVATAR_CHIP_STYLES);
+  // the layers each chip is built from (CSS gives them their insets and colours)
+  const AVATAR_CHIP_LAYERS = {
+    casino: ["pc-ins", "pc-face", "pc-race", "pc-tick pc-detail", "pc-inlay"],
+    teal: ["pc-ins", "pc-ins2", "pc-face", "pc-race pc-detail", "pc-inlay"],
+    mold: ["pc-ins", "pc-face", "pc-inlay"],
+    tricolor: ["pc-ins", "pc-face", "pc-race pc-detail", "pc-inlay"],
+  };
   const AVATAR_RANKS = ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"];
   const AVATAR_PHOTO_BUDGET = 24000; // data-URL chars; a 192px JPEG usually lands at 8-14k
   const AVATAR_TTL_MS = 5 * 60 * 1000;
@@ -10958,17 +11019,36 @@
       return box;
     }
     if (a.kind === "suit") {
-      if (a.style !== "plain") box.classList.add(a.style);
-      if (a.style === "chip") {
-        box.style.borderWidth = Math.max(2, size * 0.075).toFixed(1) + "px";
-        box.appendChild(el("span", "pavatar-chip-ring"));
+      const chip = AVATAR_CHIP_LAYERS[a.style];
+      if (chip) {
+        box.classList.add("pchip", "chip-" + a.style);
+        if (size < 56) box.classList.add("pc-small");
+        chip.forEach(cls => box.appendChild(el("span", cls)));
+        if (a.style === "mold" && size >= 56) {
+          // twelve suits embossed around the face, each turned to follow the circle
+          const order = ["spade", "heart", "club", "diamond"];
+          for (let i = 0; i < 12; i++) {
+            const angle = 15 + i * 30;
+            const rad = angle * Math.PI / 180;
+            const mark = svgEl("svg", { viewBox: "0 0 24 24", class: "pc-mark" });
+            mark.style.left = (50 + 28.5 * Math.sin(rad) - 4.25).toFixed(2) + "%";
+            mark.style.top = (50 - 28.5 * Math.cos(rad) - 4.25).toFixed(2) + "%";
+            mark.style.width = mark.style.height = "8.5%";
+            mark.style.transform = "rotate(" + angle + "deg)";
+            mark.appendChild(svgEl("path", { d: AVATAR_SUIT_PATHS[order[i % 4]] }));
+            box.appendChild(mark);
+          }
+        }
+      } else if (a.style !== "plain") {
+        box.classList.add(a.style);
       }
-      const g = ((a.style === "chip" ? 0.40 : a.style === "outline" ? 0.46 : 0.48) * size).toFixed(1);
+      const g = ((chip ? (a.style === "mold" ? 0.26 : 0.30) : a.style === "outline" ? 0.46 : 0.48) * size).toFixed(1);
       const svg = svgEl("svg", { viewBox: "0 0 24 24", class: "pavatar-glyph", width: g, height: g });
       svg.style.position = "relative";
       svg.appendChild(svgEl("path", { d: AVATAR_SUIT_PATHS[a.suit], class: "glyph-back" }));
       svg.appendChild(svgEl("path", { d: AVATAR_SUIT_PATHS[a.suit], class: "glyph-front" }));
       box.appendChild(svg);
+      if (chip) box.appendChild(el("span", "pc-shine")); // last, so the light falls over the suit too
       return box;
     }
     // cards: one card upright; two cards fanned like a held hand. Below 56px a fan no longer
@@ -11207,7 +11287,8 @@
     ui.photoRemove.addEventListener("click", () => { avatarDraft.photo = null; syncAvatarEditor(); });
     photo.append(ui.photoPick, el("p", "avatar-hint", "התמונה נחתכת לעיגול ומוקטנת. אפשר להחליף בכל רגע."), ui.photoRemove);
 
-    // suit: the four shapes, then the chosen shape in each of the four styles
+    // suit: the four shapes, then the chosen shape in two rows of four -- on its own, and on a
+    // chip -- with one selection across both rows
     const suit = el("div", "avatar-panel");
     const suitGrid = el("div", "avatar-grid4");
     AVATAR_SUITS.forEach(s => {
@@ -11220,17 +11301,19 @@
       ui.suitBtns[s] = b;
       suitGrid.appendChild(b);
     });
-    ui.styleTitle = el("p", "avatar-label", "");
-    const styleGrid = el("div", "avatar-grid4");
-    AVATAR_STYLES.forEach(([key, label]) => {
-      const b = avatarButton("avatar-style-btn");
-      const slot = el("span", "");
-      b.append(slot, el("span", "", label));
-      b.addEventListener("click", () => { avatarDraft.style = key; syncAvatarEditor(); });
-      ui.styleBtns[key] = { btn: b, slot };
-      styleGrid.appendChild(b);
+    suit.appendChild(suitGrid);
+    [["רגיל", AVATAR_SHAPE_STYLES], ["צ׳יפ", AVATAR_CHIP_STYLES]].forEach(([title, styles]) => {
+      const styleGrid = el("div", "avatar-grid4");
+      styles.forEach(([key, label]) => {
+        const b = avatarButton("avatar-style-btn");
+        const slot = el("span", "");
+        b.append(slot, el("span", "", label));
+        b.addEventListener("click", () => { avatarDraft.style = key; syncAvatarEditor(); });
+        ui.styleBtns[key] = { btn: b, slot };
+        styleGrid.appendChild(b);
+      });
+      suit.append(el("p", "avatar-label", title), styleGrid);
     });
-    suit.append(suitGrid, ui.styleTitle, styleGrid);
 
     // cards: a switch for one/two, the card(s) themselves to pick which one to edit, then rank+suit
     const cards = el("div", "avatar-panel");
@@ -11320,12 +11403,12 @@
     ui.photoRemove.hidden = !d.photo;
 
     AVATAR_SUITS.forEach(s => pressed(ui.suitBtns[s], d.suit === s));
-    ui.styleTitle.textContent = "העיצוב של ה" + AVATAR_SUIT_NAMES[d.suit];
     AVATAR_STYLES.forEach(([key]) => {
       const s = ui.styleBtns[key];
       pressed(s.btn, d.style === key);
       s.slot.textContent = "";
-      s.slot.appendChild(renderAvatarEl(formatAvatar({ kind: "suit", suit: d.suit, style: key }), 52, ""));
+      // 60px keeps the chips' fine detail (it drops out below 56) so the four read apart here
+      s.slot.appendChild(renderAvatarEl(formatAvatar({ kind: "suit", suit: d.suit, style: key }), 60, ""));
     });
 
     const two = d.count === 2;

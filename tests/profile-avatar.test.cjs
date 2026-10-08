@@ -30,12 +30,18 @@ function runJSON(code, context) {
 test('a suit avatar round-trips in every shape and style', () => {
   const c = load();
   for (const suit of ['spade', 'heart', 'diamond', 'club']) {
-    for (const style of ['plain', 'accent', 'outline', 'chip']) {
+    for (const style of ['plain', 'accent', 'outline', 'solid', 'casino', 'teal', 'mold', 'tricolor']) {
       const token = `kupa:suit:${suit}:${style}`;
       assert.deepEqual(runJSON(`parseAvatar(${JSON.stringify(token)})`, c), { kind: 'suit', suit, style });
       assert.equal(vm.runInContext(`formatAvatar(parseAvatar(${JSON.stringify(token)}))`, c), token);
     }
   }
+});
+
+test('the old dashed "chip" (versions 116-119) still reads, as the casino chip', () => {
+  const c = load();
+  assert.deepEqual(runJSON(`parseAvatar("kupa:suit:heart:chip")`, c), { kind: 'suit', suit: 'heart', style: 'casino' });
+  assert.equal(vm.runInContext(`formatAvatar(parseAvatar("kupa:suit:heart:chip"))`, c), 'kupa:suit:heart:casino');
 });
 
 test('one or two cards round-trip, including the two-digit rank', () => {
@@ -145,7 +151,16 @@ test('the editor is an overlay above settings with photo / shape / cards, and ca
   assert.match(build, /\[\["photo", "תמונה"\], \["suit", "צורה"\], \["cards", "קלפים"\]\]/);
   assert.match(build, /ui\.twoRow\.setAttribute\("role", "switch"\);/);
   assert.match(build, /file\.accept = "image\/\*";/);
-  assert.match(uiSource, /const AVATAR_STYLES = \[\["plain", "נקי"\], \["accent", "טורקיז"\], \["outline", "קו"\], \["chip", "צ׳יפ"\]\];/);
+  // two rows of four under the shapes: on its own, and on a chip
+  assert.match(uiSource, /const AVATAR_SHAPE_STYLES = \[\["plain", "נקי"\], \["accent", "טורקיז"\], \["outline", "קו"\], \["solid", "מלא"\]\];/);
+  assert.match(uiSource, /const AVATAR_CHIP_STYLES = \[\["casino", "קזינו"\], \["teal", "טורקיז"\], \["mold", "מוטבע"\], \["tricolor", "שלושה צבעים"\]\];/);
+  assert.match(build, /\[\["רגיל", AVATAR_SHAPE_STYLES\], \["צ׳יפ", AVATAR_CHIP_STYLES\]\]/);
+  // every chip style has its layer recipe and its own colour rules
+  for (const key of ['casino', 'teal', 'mold', 'tricolor']) {
+    assert.match(uiSource, new RegExp(`\\n    ${key}: \\["pc-ins"`), `${key} has layers`);
+    assert.match(html, new RegExp(`\\.pavatar\\.chip-${key} \\{ background: var\\(--chip-`), `${key} has a body colour`);
+    assert.match(html, new RegExp(`\\.chip-${key} \\.pc-inlay \\{ inset: `), `${key} has an inlay`);
+  }
 });
 
 test('every new control animates, and the global reduced-motion rule is still the last rule', () => {
