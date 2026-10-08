@@ -629,7 +629,6 @@
      connecting game's deal-* cards. */
   .gh-hero { margin: 2px 0 4px; }
   .gh-stage { position: relative; height: 118px; pointer-events: none; }
-  .gh-cap { text-align: center; font-size: 14px; font-weight: 800; margin: 0; }
   .gh-o { position: absolute; left: calc(50% - 19px); top: calc(50% - 27px); width: 38px; height: 54px; }
   .gh-c { position: relative; width: 100%; height: 100%; transform-origin: 50% 50%; transform-style: preserve-3d; }
   .gh-face, .gh-back { position: absolute; inset: 0; border-radius: 4px; overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; direction: ltr; }
@@ -1749,7 +1748,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 131</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 132</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -7751,7 +7750,7 @@
       const wrap = el("div", "gh-hero");
       const stage = el("div", "gh-stage");
       stage.setAttribute("aria-hidden", "true");
-      wrap.append(stage, el("p", "gh-cap", "הערב הראשון מתחיל כאן"));
+      wrap.append(stage);
       ghHero = { wrap, stage, gen: 0, running: false };
     }
     parent.appendChild(ghHero.wrap);
