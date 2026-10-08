@@ -1091,7 +1091,6 @@
   }
   .corner-btn .cicon { display: flex; transition: transform .25s ease; }
   .corner-btn svg { width: 23px; height: 23px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-  .corner-btn:hover { color: var(--accent); }
   .corner-btn:active .cicon { transform: scale(.85) rotate(-30deg); }
   .corner-btn.danger-armed { color: var(--bad); }
   /* The second-tap warning under "מחק שולחן": what the delete costs, in the button's own red. */
@@ -1330,7 +1329,6 @@
     width: 44px; min-height: 44px; margin-inline-start: 2px; padding: 10px;
     color: var(--dim); transition: color .2s, opacity .2s;
   }
-  .set-name-edit:hover { color: var(--accent); }
   .set-name-edit svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .set-name-editor { width: 100%; max-width: 260px; display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: -12px; }
   .set-name-editor-actions { display: flex; align-items: center; justify-content: center; gap: 12px; }
@@ -1381,7 +1379,17 @@
   .corner-btn.on { color: var(--accent); }
   .corner-btn.on .cicon { transform: rotate(60deg); }
   .set-identity { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
-  .set-identity .set-name { margin-top: 6px; }
+  /* the big name is underlined, with its pencil beside it; an empty first track the pencil's
+     width keeps the name itself centred under the picture */
+  .set-name-line { display: grid; grid-template-columns: 44px auto 44px; align-items: center; margin-top: 6px; }
+  .set-name-line::before { content: ""; }
+  .set-name-line .set-name { padding-bottom: 4px; border-bottom: 1px solid var(--faint); overflow-wrap: anywhere; }
+  .set-name-line .set-name-edit { margin-inline-start: 0; color: var(--faint); }
+  #settings .set-identity .set-name-editor {
+    width: 100%; max-width: 300px; align-self: center; padding: 4px 0 0; border-bottom: 0;
+  }
+  #settings .set-identity .set-name-editor input { text-align: center; font-size: 18px; font-weight: 700; }
+  #settings .set-identity .set-name-editor-actions { justify-content: center; }
   #settings .set-account, #settings .set-local-note { margin: 0; font-size: 13px; font-weight: 300; color: var(--dim); overflow-wrap: anywhere; }
   .set-signin { display: flex; flex-direction: column; gap: 10px; }
   .set-signin .games-primary-reason { margin: 0; text-align: center; line-height: 1.5; }
@@ -1404,10 +1412,10 @@
   .set-row-sub { font-size: 12px; font-weight: 300; color: var(--dim); line-height: 1.4; }
   .set-row-value { font-size: 14px; color: var(--dim); overflow-wrap: anywhere; }
   .set-row .set-name-edit { margin-inline-end: -10px; color: var(--faint); }
-  .set-row .set-name-edit:hover { color: var(--accent); }
   .set-row-btn { font-size: 15px; font-weight: 500; }
-  .set-row-btn:hover { color: var(--accent); }
-  .set-row-btn.danger, .set-row-btn.danger:hover, .set-row-btn.danger.armed { color: var(--bad); }
+  .set-row-btn.danger, .set-row-btn.danger.armed { color: var(--bad); }
+  .switch:disabled { opacity: .5; }
+  .set-signout-btn { width: 100%; align-self: stretch; margin-top: 4px; }
   .set-row-btn:disabled { color: var(--faint); cursor: default; }
   /* the legal links stay plain text links; the "opens elsewhere" arrow is drawn here */
   .set-row-link { justify-content: space-between; font-size: 15px; font-weight: 500; }
@@ -1416,13 +1424,6 @@
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'/%3E%3C/svg%3E") center / contain no-repeat;
             mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'/%3E%3C/svg%3E") center / contain no-repeat;
   }
-  .set-row-action {
-    flex: 0 0 auto; min-height: 36px; padding: 0 16px; border-radius: 999px;
-    border: 1px solid var(--accent); color: var(--accent); font-size: 13px; font-weight: 700;
-    transition: transform .12s ease, opacity .2s ease;
-  }
-  .set-row-action:active { transform: scale(.94); }
-  .set-row-action:disabled { opacity: .5; }
   #settings .set-contact-row { justify-content: flex-start; gap: 12px; }
   #settings .set-contact-view { align-items: flex-end; }
   #settings .set-contact-line { text-align: end; }
@@ -1490,8 +1491,12 @@
   .set-flat:disabled { color: var(--faint); cursor: default; }
   .set-flat:disabled:hover { color: var(--faint); }
 
-  /* Background hover feedback belongs only to devices that can actually hover. */
+  /* Background hover feedback belongs only to devices that can actually hover. The corner gear
+     and the settings rows are here too: on a phone a tapped control keeps :hover, which left the
+     gear looking lit after settings closed. */
   @media (hover: hover) {
+    .corner-btn:hover { color: var(--accent); }
+    .set-row-btn:not(.danger):hover, .set-name-edit:hover { color: var(--accent); }
     .exit-confirm:hover { background: var(--bad-press); border-color: var(--bad-press); color: var(--bg); }
     .games-quick-action.primary:hover { background: var(--accent); color: var(--bg); }
     .games-card-enter:hover { background: var(--accent); color: var(--bg); }
@@ -2040,7 +2045,19 @@
 
       <div class="set-identity">
         <button type="button" class="pavatar-edit" id="setAvatar" aria-label="עריכת תמונת הפרופיל"></button>
-        <div class="set-name" id="setName"></div>
+        <div class="set-name-line" id="setNameLine">
+          <div class="set-name" id="setName"></div>
+          <button type="button" class="set-name-edit" id="setNameEdit" aria-label="עריכת השם">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.83 2.83 0 0 0-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg>
+          </button>
+        </div>
+        <div class="set-name-editor" id="setNameEditor" hidden>
+          <input type="text" id="setNameInput" maxlength="40" autocomplete="name" aria-label="שם">
+          <div class="set-name-editor-actions">
+            <button type="button" class="set-name-save" id="setNameSave">שמור</button>
+            <button type="button" id="setNameCancel">ביטול</button>
+          </div>
+        </div>
         <p class="set-account" id="setAccount" dir="ltr" hidden></p>
         <p class="set-local-note" id="setLocalNote" hidden>בלי חשבון · נשמר רק במכשיר הזה</p>
       </div>
@@ -2057,20 +2074,6 @@
       <section class="set-section">
         <h3 class="set-section-title" id="setAccountTitle">חשבון</h3>
         <div class="set-group">
-          <div class="set-row set-row-tap">
-            <span class="set-row-label">שם</span>
-            <span class="set-row-value" id="setNameValue"></span>
-            <button type="button" class="set-name-edit" id="setNameEdit" aria-label="עריכת השם">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.83 2.83 0 0 0-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg>
-            </button>
-          </div>
-          <div class="set-name-editor" id="setNameEditor" hidden>
-            <input type="text" id="setNameInput" maxlength="40" autocomplete="name" aria-label="שם">
-            <div class="set-name-editor-actions">
-              <button type="button" class="set-name-save" id="setNameSave">שמור</button>
-              <button type="button" id="setNameCancel">ביטול</button>
-            </div>
-          </div>
           <div class="set-row set-row-tap set-contact-row">
             <span class="set-row-label">פרטי קשר</span>
             <div class="set-contact-view" id="setContactView">
@@ -2091,29 +2094,18 @@
             </div>
           </div>
           <p class="games-primary-reason set-row-note" id="setContactNote" hidden>פרטי הקשר מגיעים מחשבון Google.</p>
-          <button type="button" class="set-row set-row-btn" id="setSwapBtn">התנתקות</button>
-        </div>
-      </section>
-
-      <section class="set-section">
-        <h3 class="set-section-title">תצוגה</h3>
-        <div class="set-group">
-          <div class="set-row set-row-tap">
-            <span class="set-row-label" id="setThemeLabel">מצב כהה</span>
-            <button type="button" class="switch" id="setThemeSwitch" role="switch" aria-labelledby="setThemeLabel"></button>
-          </div>
         </div>
       </section>
 
       <section class="set-section" id="setPush" hidden>
         <h3 class="set-section-title">התראות</h3>
         <div class="set-group">
-          <div class="set-row">
+          <div class="set-row set-row-tap">
             <span class="set-row-text">
-              <span class="set-row-label">התראות לטלפון</span>
+              <span class="set-row-label" id="setPushLabel">התראות לטלפון</span>
               <span class="set-row-sub" id="setPushNote"></span>
             </span>
-            <button type="button" class="set-row-action" id="setPushBtn">הפעל</button>
+            <button type="button" class="switch" id="setPushBtn" role="switch" aria-checked="false" aria-labelledby="setPushLabel"></button>
           </div>
           <button type="button" class="set-row set-row-btn" id="setPushTestBtn" hidden>שלח התראת ניסיון</button>
         </div>
@@ -2147,7 +2139,8 @@
         </div>
       </section>
 
-      <p class="set-version">גרסה 150</p>
+      <button type="button" class="btn-quiet set-signout-btn" id="setSwapBtn">התנתקות</button>
+      <p class="set-version">גרסה 151</p>
     </div>
   </section><!-- /#settings -->
 
@@ -12385,6 +12378,24 @@
       try { await sub.unsubscribe(); } catch (e) {}
     }
   }
+  function pushIsOn() {
+    return pushSupport() === "ok" && Notification.permission === "granted" && !!authUser && pushRegisteredFor === authUser.id;
+  }
+  // The settings switch. Turning on goes straight into enablePushNotifications with no await in
+  // between, so the permission prompt still runs inside the tap (iOS asks only then); turning off
+  // removes this device's subscription from the server and from the browser.
+  async function togglePushNotifications() {
+    if (!supabase) return;
+    if (!cloudMode() || pushBusy) return;
+    if (!pushIsOn()) { await enablePushNotifications(); return; }
+    pushBusy = true; pushMessage = ""; refreshPushRow();
+    try {
+      await disablePushNotifications();
+    } finally {
+      pushBusy = false;
+      refreshPushRow();
+    }
+  }
   async function sendTestNotification() {
     if (!supabase) return;
     if (!cloudMode() || pushBusy) return;
@@ -12457,10 +12468,12 @@
     const btn = document.getElementById("setPushBtn");
     const test = document.getElementById("setPushTestBtn");
     const support = pushSupport();
-    const on = support === "ok" && Notification.permission === "granted" && !!authUser && pushRegisteredFor === authUser.id;
-    btn.hidden = support !== "ok" || on;
+    const on = pushIsOn();
+    // a switch: on while this device is registered for this account; tapping it turns that on or off
+    btn.hidden = support !== "ok";
     btn.disabled = pushBusy;
-    btn.textContent = pushBusy ? "רגע…" : "הפעל";
+    btn.classList.toggle("on", on);
+    btn.setAttribute("aria-checked", on ? "true" : "false");
     test.hidden = !on;
     test.disabled = pushBusy;
     note.textContent = pushMessage
@@ -12494,19 +12507,15 @@
     refreshPushRow();
     document.getElementById("setSwapBtn").textContent = "התנתקות";
     document.getElementById("setAccountTitle").textContent = authUser ? "חשבון" : "פרטים";
-    document.getElementById("setNameValue").textContent = me || "אורח";
     // Danger zone: "איפוס רקורד" is there for everyone, so its title always shows; account
     // deletion only makes sense for a signed-in account.
     document.getElementById("setDeleteAccountToggle").hidden = !authUser;
+    // the underlined name and its pencil give way to the editor while it is open
+    document.getElementById("setNameLine").hidden = setNameEditing;
     document.getElementById("setNameEdit").hidden = false;
     document.getElementById("setNameEditor").hidden = !setNameEditing;
     document.getElementById("setNameInput").value = me || "";
     refreshContact();
-    // the row reads "מצב כהה", so the switch is on while the dark theme is
-    const isDark = document.documentElement.dataset.theme !== "light";
-    const sw = document.getElementById("setThemeSwitch");
-    sw.classList.toggle("on", isDark);
-    sw.setAttribute("aria-checked", isDark ? "true" : "false");
   }
   // Read-only by default: the stored phone/mail render as quiet lines, and only the pencil opens
   // the inputs. A Google-linked account never gets the pencil — its details come from the
@@ -12586,10 +12595,6 @@
     const control = row.querySelector("button:not([hidden])");
     if (control) control.click();
   });
-  document.getElementById("setThemeSwitch").addEventListener("click", () => {
-    toggleTheme();
-    refreshSettings();
-  });
   function closeSetNameEditor() {
     setNameEditing = false;
     refreshSettings();
@@ -12622,7 +12627,7 @@
     leaveSettings();
     showLogin();
   });
-  document.getElementById("setPushBtn").addEventListener("click", enablePushNotifications);
+  document.getElementById("setPushBtn").addEventListener("click", togglePushNotifications);
   document.getElementById("pushPromptAllow").addEventListener("click", allowFromPushPrompt);
   document.getElementById("pushPromptLater").addEventListener("click", () => {
     state.pushPromptDismissed = true;
