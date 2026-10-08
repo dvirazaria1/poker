@@ -70,7 +70,7 @@ test('the open group card: a big table button, a "סטטיסטיקות" tile, th
   assert.match(main, /el\("button", "games-group-table-btn"\)/);
   assert.match(main, /<span>סטטיסטיקות<\/span>/);
   assert.match(main, /stats\.addEventListener\("click", \(\) => setGroupCardMode\("details", "games"\)\);/);
-  assert.match(main, /row\.append\(stats, table\);/); // statistics on the start (right) side
+  assert.match(main, /row\.append\(stats, rest\);/); // statistics on the start (right) side, the rest beside it
   assert.match(main, /join\.addEventListener\("click", \(\) => shareGroupInvite\(group\)\);/);
   assert.doesNotMatch(main, /formatGamesPlayedCount/);
   assert.doesNotMatch(main, /"פירוט"/);
@@ -154,8 +154,10 @@ test('active-game and group cards accept an anim/animDelay pair to drive the ent
 test('mode and tab changes turn the card like a page: side by side in a clipped track, no fades or overlays', () => {
   const src = sourceBetween('  function setGroupCardMode(mode, tab) {', '  // A row of square tiles;');
   // statistics move sideways, settings vertically; closing is the mirror image of opening
-  assert.match(src, /\? \{ axis: "y", forward: mode === "settings" \}\s*: \{ axis: "x", forward: mode === "details" \};/);
-  assert.match(src, /turnGroupCardPage\(".games-group-view", \{ axis: expandedGroupMode === "settings" \? "y" : "x", forward: true \}\);/);
+  assert.match(src, /turnGroupCardPage\(\[".games-group-body-content"\], \{ axis: "y", forward: mode === "settings" \}\);/);
+  // statistics: the tile under the thumb stays; only the rest of its row and the content below turn
+  assert.match(src, /turnGroupCardPage\(\[".games-group-row-rest", ".games-group-below"\], \{ axis: "x", forward: mode === "details" \}\);/);
+  assert.match(src, /turnGroupCardPage\(\[".games-group-view"\], \{ axis: expandedGroupMode === "settings" \? "y" : "x", forward: true \}\);/);
   assert.match(src, /fromMove = turn\.forward \? "translateX\(0\)" : "translateX\(-100%\)";/);
   assert.match(src, /toMove = turn\.forward \? "translateX\(-100%\)" : "translateX\(0\)";/);
   assert.match(src, /clip\.animate\(\[\{ height: fromHeight \+ "px" \}, \{ height: toHeight \+ "px" \}\]/);

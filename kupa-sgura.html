@@ -552,6 +552,8 @@
   }
   .games-group-stats-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .games-group-tabs .games-group-action { flex: 1 1 0; }
+  .games-group-row-rest { flex: 1 1 auto; min-width: 0; display: flex; gap: 8px; }
+  .games-group-main-actions > .games-page-clip { flex: 1 1 auto; min-width: 0; }
   /* ---- Open-card page turn (2026-10-08, rebuilt from scratch). A mode or tab change is a page
      turn: the old page and the new one sit side by side in a clipped track and move together --
      statistics sideways (opening travels leftwards, "חזור" rightwards), settings vertically
@@ -1422,7 +1424,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 113</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 114</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -6999,10 +7001,13 @@
     expandedGroupTab = tab || "";
     disarmGroupCardAction();
     resetStartGamePanel();
-    const turn = from === "settings" || mode === "settings"
-      ? { axis: "y", forward: mode === "settings" }
-      : { axis: "x", forward: mode === "details" };
-    turnGroupCardPage(".games-group-body-content", turn);
+    if (from === "settings" || mode === "settings") {
+      turnGroupCardPage([".games-group-body-content"], { axis: "y", forward: mode === "settings" });
+    } else {
+      // The "סטטיסטיקות"/"חזור" tile stays under the thumb; the rest of its row and everything
+      // below it turn together (opening leftwards, closing rightwards).
+      turnGroupCardPage([".games-group-row-rest", ".games-group-below"], { axis: "x", forward: mode === "details" });
+    }
   }
   function setGroupCardTab(tab) {
     const current = expandedGroupTab || (expandedGroupMode === "settings" ? "details" : "games");
@@ -7010,30 +7015,34 @@
     expandedGroupTab = tab;
     disarmGroupCardAction();
     // Inside a screen the content keeps moving the way that screen opened.
-    turnGroupCardPage(".games-group-view", { axis: expandedGroupMode === "settings" ? "y" : "x", forward: true });
+    turnGroupCardPage([".games-group-view"], { axis: expandedGroupMode === "settings" ? "y" : "x", forward: true });
   }
 
-  // Re-renders the dashboard and turns the open card from the old page (`selector`, the whole
-  // body or just its view) to the new one. Both pages go into a clipped track: forward on "x"
-  // puts the new page to the right and slides everything left, backward the mirror image; forward
-  // on "y" puts the new page above and slides everything down, backward slides up. The clip's
-  // height runs from the old page's to the new page's, then the new page is put back in place.
-  // Reduced motion, or no open card: a plain re-render.
-  // fill "forwards" holds the last frame until settle() swaps the page back in -- no flash between.
+  // Re-renders the dashboard and turns each region of the open card named in `selectors` (the
+  // whole body, the rest of the top row, the content under it, or just a view) from its old page
+  // to its new one. Each region gets a clipped track holding both pages: forward on "x" puts the
+  // new page to the right and slides everything left, backward is the mirror image; forward on
+  // "y" puts the new page above and slides everything down, backward slides up. The clip's height
+  // runs from the old page's to the new page's, then the new page is put back in place.
+  // Reduced motion, or a region missing on either side: a plain re-render.
+  // fill "forwards" holds the last frame until the page is swapped back in -- no flash between.
   const GROUP_PAGE_TURN = { duration: 340, easing: "cubic-bezier(.32, .72, 0, 1)", fill: "forwards" };
-  function turnGroupCardPage(selector, turn) {
+  function turnGroupCardPage(selectors, turn) {
     const reduce = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const findPage = () => {
+    const findPage = (selector) => {
       const body = document.querySelector(".games-group-card.expanded .games-group-body");
       return body ? body.querySelector(selector + ":not(.games-page-leaving)") : null;
     };
-    const oldPage = findPage();
-    if (reduce || !oldPage || typeof oldPage.animate !== "function") { renderGamesDashboard(); return; }
-    oldPage.classList.add("games-page-leaving");
+    const oldPages = selectors.map(findPage);
+    if (reduce || oldPages.some(p => !p || typeof p.animate !== "function")) { renderGamesDashboard(); return; }
+    oldPages.forEach(p => p.classList.add("games-page-leaving"));
     renderGamesDashboard();
-    const newPage = findPage();
-    if (!newPage || !newPage.parentNode) return;
-
+    selectors.forEach((selector, i) => {
+      const newPage = findPage(selector);
+      if (newPage && newPage.parentNode) slideGroupCardPages(oldPages[i], newPage, turn);
+    });
+  }
+  function slideGroupCardPages(oldPage, newPage, turn) {
     const clip = el("div", "games-page-clip");
     const track = el("div", "games-page-track" + (turn.axis === "y" ? " y" : ""));
     const leaving = el("div", "games-page");
@@ -7123,12 +7132,16 @@
     stats.type = "button";
     stats.innerHTML = GROUP_ACTION_ICONS.details + "<span>סטטיסטיקות</span>";
     stats.addEventListener("click", () => setGroupCardMode("details", "games"));
-    // 2026-10-08: "סטטיסטיקות" sits on the start (right) side; in statistics the same tile reads
-    // "חזור", so the page turn keeps it where the thumb already is.
-    row.append(stats, table);
+    // 2026-10-08: "סטטיסטיקות" sits on the start (right) side and never moves: in statistics the
+    // same tile reads "חזור", and only what is to its left (.games-group-row-rest) and under the
+    // row (.games-group-below) turn like a page.
+    const rest = el("div", "games-group-row-rest");
+    rest.appendChild(table);
+    row.append(stats, rest);
     content.appendChild(row);
-    if (reason) content.appendChild(el("p", "games-group-action-reason", reason));
-    if (pickerOpen) content.appendChild(renderStartGamePanel());
+    const below = el("div", "games-group-below");
+    if (reason) below.appendChild(el("p", "games-group-action-reason", reason));
+    if (pickerOpen) below.appendChild(renderStartGamePanel());
 
     const players = el("div", "games-group-players");
     const archived = isGroupArchived(groupId);
@@ -7147,7 +7160,8 @@
       players.appendChild(rowEl);
     });
     if (!members.length) players.appendChild(el("p", "games-empty", "אין חברים פעילים"));
-    content.appendChild(players);
+    below.appendChild(players);
+    content.appendChild(below);
   }
 
   // Details mode: the same card, the tiles become back / games / ranking / stats and the member
@@ -7162,7 +7176,7 @@
     back.type = "button";
     back.innerHTML = GROUP_ACTION_ICONS.back + "<span>חזור</span>";
     back.addEventListener("click", () => setGroupCardMode("main"));
-    row.appendChild(back);
+    const rest = el("div", "games-group-row-rest");
     [
       { key: "games", icon: "history", label: "משחקים" },
       { key: "ranking", icon: "trophy", label: "דירוג" },
@@ -7170,8 +7184,9 @@
     ].forEach(t => {
       const btn = groupActionButton(t.icon, t.label, () => setGroupCardTab(t.key), t.key === tab ? "on" : "");
       btn.setAttribute("aria-pressed", String(t.key === tab));
-      row.appendChild(btn);
+      rest.appendChild(btn);
     });
+    row.append(back, rest);
     content.appendChild(row);
     const collections = collectionsOf(state);
     const games = resolveGroupGameSummaries(collections, groupId, cloudGroupAggregates);
@@ -7185,7 +7200,9 @@
     } else {
       renderGroupCardTimeline(view, games);
     }
-    content.appendChild(view);
+    const below = el("div", "games-group-below");
+    below.appendChild(view);
+    content.appendChild(below);
   }
   function renderGroupCardTimeline(view, games) {
     const list = el("div", "games-group-timeline");
