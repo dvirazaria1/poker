@@ -113,8 +113,9 @@ test('createGroup pushes a Group and an admin GroupMember, then saves and opens 
 
 test('appView accepts "group" as a navigable view, opened via openGroup', () => {
   assert.match(html, /let appView = "games";\s*\/\/ "friends" \| "games" \| "game" \| "settle" \| "profile" \| "group"/);
-  assert.match(html, /function openGroup\(groupId\) \{/);
-  assert.match(html, /setAppView\("group"\)/);
+  // 2026-10-08: openGroup now opens the group's card on the dashboard; the "group" view stays
+  // routable but nothing navigates to it any more.
+  assert.match(html, /function openGroup\(groupId, mode\) \{/);
   assert.match(html, /function renderGroupPage\(\)/);
   assert.match(html, /function renderGroupHeader\(summary, onBack, onSettings\)/);
   // Updated for the group-page-as-sheet change: "group" now renders the dashboard *and* the
@@ -134,7 +135,7 @@ test('the group view reuses the games dashboard shell and hides the game/settle 
 // closure so the card always shows its press state before actions.onOpen runs — strengthened
 // here to also assert the keyboard path reuses that same closure, which the old direct-call
 // assertion couldn't express.
-test('the group card row opens in place on the dashboard (the preview only for archived cards) and is keyboard-accessible', () => {
+test('the group card row opens in place on the dashboard, archived cards too, and is keyboard-accessible', () => {
   const source = sourceBetween('  function renderGroupCard(group, actions) {', '  function renderGroupsSection(');
   assert.match(source, /head\.setAttribute\("role", "button"\)/);
   assert.match(source, /head\.setAttribute\("tabindex", "0"\)/);
@@ -148,7 +149,8 @@ test('the group card row opens in place on the dashboard (the preview only for a
   const sectionSource = sourceBetween('  function renderGroupsSection(', '  function renderArchivedGroupsSection(');
   assert.match(sectionSource, /onToggle: \(\) => toggleGroupCard\(groupId\)/);
   const archived = sourceBetween('  function renderArchivedGroupsSection(', '  function closeArchivedGroups()');
-  assert.match(archived, /onOpen: \(\) => openGroupPreview\(groupId\)/);
+  assert.match(archived, /onToggle: \(\) => toggleGroupCard\(groupId\)/);
+  assert.doesNotMatch(archived, /openGroupPreview/);
 });
 
 // ---------- group card press + layout (owner ask: animate on tap, count beside the name) ----------

@@ -187,11 +187,14 @@ test('renderGroupPage renders into the #groupSheet overlay, not into #gamesHome 
   assert.match(source, /if \(appView !== "group"\) return;/);
 });
 
-test('openGroup keeps setting currentGroupId and calling setAppView("group") unchanged by the sheet presentation', () => {
-  const source = sourceBetween('  function openGroup(groupId) {', '  function repairMyGroupMembership(');
-  assert.match(source, /currentGroupId = String\(groupId \|\| ""\);/);
-  assert.match(source, /repairMyGroupMembership\(currentGroupId\);/);
-  assert.match(source, /setAppView\("group"\);/);
+test('openGroup opens the group card in place (the old group sheet is retired, 2026-10-08)', () => {
+  const source = sourceBetween('  function openGroup(groupId, mode) {', '  function repairMyGroupMembership(');
+  assert.match(source, /currentGroupId = id;/);
+  assert.match(source, /repairMyGroupMembership\(id\);/);
+  assert.match(source, /expandedGroupId = id;/);
+  assert.match(source, /expandedGroupMode = mode === "details" \? "details" : "main";/);
+  assert.match(source, /if \(appView === "games"\) renderGamesDashboard\(\); else setAppView\("games"\);/);
+  assert.doesNotMatch(source, /setAppView\("group"\)/);
 });
 
 test('the group route is a real overlay (#groupSheet/#groupSheetContent markup) that syncGroupSheet opens/closes off appView, reversing the transition before hiding', () => {

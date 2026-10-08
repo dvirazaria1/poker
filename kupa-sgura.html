@@ -1405,7 +1405,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 105</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 106</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -6309,11 +6309,28 @@
     continueCurrentGame();
   }
 
-  function openGroup(groupId) {
+  // 2026-10-08 (owner ask): the group page/sheet and the preview modal are retired. Every way
+  // into a group -- the table's back arrow, joining by invite, closing a group game -- opens that
+  // group's card in place on the dashboard. mode "details" lands on its statistics (game history),
+  // which is where a closed game should leave you.
+  function openGroup(groupId, mode) {
     closeGroupPreview();
-    currentGroupId = String(groupId || "");
-    repairMyGroupMembership(currentGroupId);
-    setAppView("group");
+    const id = String(groupId || "");
+    currentGroupId = id;
+    repairMyGroupMembership(id);
+    resetStartGamePanel();
+    disarmGroupCardAction();
+    expandedGroupId = id;
+    expandedGroupMode = mode === "details" ? "details" : "main";
+    expandedGroupTab = mode === "details" ? "games" : "";
+    expandedGroupJustOpened = true;
+    const raw = (Array.isArray(state.groups) ? state.groups : []).find(g => g && g.id === id);
+    if (raw && raw.archivedAt) archivedGroupsOpen = true;
+    if (appView === "games") renderGamesDashboard(); else setAppView("games");
+    afterNextFrame(() => {
+      const card = document.querySelector(".games-group-card.expanded");
+      if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   // Signed in only: a group I created that shows no active member has lost my own membership row.
@@ -6887,6 +6904,10 @@
   // Inside: four buttons (invite, table, details, settings), then the members one under another.
   // "פירוט" still opens the full preview (ranking + game history); the settings overlay and the
   // start-game picker work off currentGroupId, so every button points it at this card's group.
+  function isGroupArchived(groupId) {
+    const raw = (Array.isArray(state.groups) ? state.groups : []).find(g => g && g.id === groupId);
+    return !!(raw && raw.archivedAt);
+  }
   function toggleGroupCard(groupId) {
     const id = String(groupId || "");
     if (expandedGroupId === id) { collapseGroupCard(); return; }
@@ -7018,7 +7039,8 @@
     if (pickerOpen) content.appendChild(renderStartGamePanel());
 
     const players = el("div", "games-group-players");
-    if (group.isMember) {
+    const archived = isGroupArchived(groupId);
+    if (group.isMember && !archived) {
       const join = el("button", "games-group-player games-group-join");
       join.type = "button";
       join.innerHTML = '<span>צרף חבר</span><svg class="games-group-join-plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"></path></svg>';
@@ -7151,7 +7173,8 @@
       const groupId = String(group.groupId || "");
       content.appendChild(renderGroupCard(group, {
         archived: true,
-        onOpen: () => openGroupPreview(groupId),
+        expanded: expandedGroupId === groupId,
+        onToggle: () => toggleGroupCard(groupId),
       }));
     });
     detailsIn.appendChild(content);
@@ -7397,13 +7420,27 @@
     if (group.isAdmin) view.appendChild(el("p", "games-group-edit-hint", "לחץ על התמונה כדי להחליף אותה"));
 
     const actions = el("div", "games-group-danger");
-    if (group.isAdmin) {
+    if (group.isAdmin && raw.archivedAt) {
+      const restore = el("button", "set-flat", "שחזר מהארכיון");
+      restore.type = "button";
+      restore.addEventListener("click", () => {
+        if (!unarchiveGroup(state.groups, groupId)) return;
+        save();
+        archivedGroupsOpen = false;
+        renderGamesDashboard();
+      });
+      const item = el("div", "games-group-danger-item");
+      item.appendChild(restore);
+      actions.appendChild(item);
+    } else if (group.isAdmin) {
       actions.appendChild(groupCardArmedButton("archive", "העבר לארכיון", "בטוח? הקבוצה תעבור לארכיון", group.hasActiveGame ? "סגור קודם את המשחק הפעיל" : null, () => {
         if (!archiveGroup(state.groups, groupId, new Date().toISOString())) return;
         save();
         expandedGroupId = "";
         renderGamesDashboard();
       }));
+    }
+    if (group.isAdmin) {
       actions.appendChild(groupCardArmedButton("delete", "מחק קבוצה", "בטוח? ההיסטוריה הקבוצתית תוסתר", group.hasActiveGame ? "סגור קודם את המשחק הפעיל" : null, () => {
         if (!deleteGroup(state.groups, groupId, new Date().toISOString())) return;
         save();
@@ -9200,7 +9237,7 @@
     openMenu = null; customOpen = null;
     save();
     const closedGroup = closedGroupId && state.groups.find(g => g.id === closedGroupId && !g.deletedAt);
-    if (closedGroup) openGroup(closedGroupId);
+    if (closedGroup) openGroup(closedGroupId, "details");
     else setAppView("games");
     if (balanced) confetti();
   }

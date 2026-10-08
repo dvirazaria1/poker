@@ -143,7 +143,7 @@ test('group page sections stagger in only right after a navigation, not on every
   const setAppViewSource = sourceBetween('  function setAppView(nextView) {', '  function flashViewEnter');
   assert.match(setAppViewSource, /groupPageEnterNext\s*=\s*nextView === "group"/, 'setAppView should arm the stagger only when navigating to the group view');
   const openGroupSource = sourceBetween('  function openGroup(', '  // Creates a group and its creator admin membership');
-  assert.match(openGroupSource, /setAppView\("group"\)/, 'openGroup() should navigate through setAppView so the stagger gets armed');
+  assert.match(openGroupSource, /setAppView\("games"\)/, 'openGroup() now opens the group card on the dashboard (2026-10-08)');
   const renderGroupPageSource = sourceBetween('  function renderGroupPage()', '  function render() {');
   assert.match(renderGroupPageSource, /const enterStagger = groupPageEnterNext;/, 'renderGroupPage should consume the flag once per call');
   assert.match(renderGroupPageSource, /groupPageEnterNext = false;/, 'renderGroupPage should reset the flag so in-place re-renders do not replay the stagger');

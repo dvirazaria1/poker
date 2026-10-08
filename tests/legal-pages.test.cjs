@@ -7,7 +7,7 @@ const fs = require('node:fs');
 // a terms of service page, both shipped as standalone files next to
 // index.html (no build step, see CLAUDE.md / build.py).
 
-const CONTACT_EMAIL = 'dvirazaria1@gmail.com';
+const CONTACT_EMAIL = 'dvirazria1@gmail.com';
 const PAGES = ['privacy.html', 'terms.html'];
 // Only the Google Fonts hosts already used by the app, and the app's own
 // (relative) links, are allowed — no analytics, no third-party scripts.

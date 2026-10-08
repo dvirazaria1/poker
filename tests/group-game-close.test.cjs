@@ -15,7 +15,7 @@ function sourceBetween(startMarker, endMarker) {
 
 // ---------- finishCloseTable frees the group slot and routes back to the group page ----------
 
-test('finishCloseTable captures the closing group, drops the closing game\'s own slot, and routes to the group page', () => {
+test('finishCloseTable captures the closing group, drops the closing game\'s own slot, and routes to the group card\'s statistics', () => {
   const source = sourceBetween(
     '  function finishCloseTable() {',
     '  document.getElementById("closeTableBtn").addEventListener("click"'
@@ -29,8 +29,8 @@ test('finishCloseTable captures the closing group, drops the closing game\'s own
   // generically by the staleness guard in tests/multi-game-migration.test.cjs).
   assert.match(source, /state\.games = \(Array\.isArray\(state\.games\) \? state\.games : \[\]\)\.filter\(g => g\.gameId !== state\.gameId\);/);
   assert.match(source, /state\.gameId = newId\(\);/);
-  // A group game returns to its group page; an ungrouped game still lands on Games.
-  assert.match(source, /openGroup\(closedGroupId\)/);
+  // A group game lands on its group's card, opened on the statistics; an ungrouped one on Games.
+  assert.match(source, /openGroup\(closedGroupId, "details"\)/);
   assert.match(source, /else setAppView\("games"\);/);
   // Balanced confetti is unconditional on which branch was taken.
   assert.match(source, /if \(balanced\) confetti\(\);/);
