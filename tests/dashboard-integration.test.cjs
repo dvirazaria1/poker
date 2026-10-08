@@ -186,7 +186,8 @@ test('every top-row tile of the open card is 54px tall, and the statistics tile 
 
 test('an empty Games screen shows the dealer hero; anything to list stops it', () => {
   const dash = sourceBetween('  function renderGamesDashboard() {', '  // Task 6: a body scroll-lock');
-  assert.match(dash, /if \(!activeSummaries\.length && !groupSummaries\.length\) renderGamesEmptyHero\(inner\); else ghStop\(\);/);
+  assert.match(dash, /const empty = !activeSummaries\.length && !groupSummaries\.length;/);
+  assert.match(dash, /if \(empty\) renderGamesEmptyHero\(inner\); else ghStop\(\);/);
   const hero = sourceBetween('  function renderGamesEmptyHero(parent) {', '  function ghStop() {');
   // built once and re-appended, so a background re-render never restarts the animation
   assert.match(hero, /if \(!ghHero\) \{/);

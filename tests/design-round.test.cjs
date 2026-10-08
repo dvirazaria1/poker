@@ -438,8 +438,9 @@ test('renderGamesDashboard opens with a title like the friends page, then the le
   // padding puts it at the same height (measured: both tops at 98px on a 375x812 viewport).
   const source = sourceBetween('  function renderGamesDashboard() {', '  function renderGroupHeader(');
   assert.match(source, /el\("div", "games-home-in games-home-dash"\)/);
-  assert.match(source, /inner\.appendChild\(el\("h2", "games-home-title", "השולחנות שלך"\)\);\s*inner\.appendChild\(el\("p", "games-home-lead", "המשחקים הפעילים והקבוצות שלך במקום אחד\."\)\);\s*const activeSummaries = /);
-  assert.match(source, /if \(!activeSummaries\.length && !groupSummaries\.length\) renderGamesEmptyHero\(inner\); else ghStop\(\);\s*renderActiveGamesSection\(/);
+  // 2026-10-08: with nothing to list, an onboarding heading ("אול־אין על הערב הבא") over the dealer.
+  assert.match(source, /const empty = !activeSummaries\.length && !groupSummaries\.length;\s*inner\.appendChild\(el\("h2", "games-home-title", empty \? "אול־אין על הערב הבא" : "השולחנות שלך"\)\);\s*inner\.appendChild\(el\("p", "games-home-lead", empty \? "צור קבוצה, צרף את החבר'ה, ואת כל השאר תשאיר לנו\." : "המשחקים הפעילים והקבוצות שלך במקום אחד\."\)\);/);
+  assert.match(source, /if \(empty\) renderGamesEmptyHero\(inner\); else ghStop\(\);\s*renderActiveGamesSection\(/);
   // 2026-10-08: "משחק ללא קבוצה" is a dashed card that closes the group list.
   assert.match(source, /renderGroupsSection\([^;]*;\s*renderQuickActions\(inner\);/);
   assert.match(html, /\.games-home-title \{[^}]*font-size: 20px; font-weight: 800;/);
