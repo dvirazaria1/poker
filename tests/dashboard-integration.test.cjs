@@ -7,6 +7,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const vm = require('node:vm');
 
 const html = fs.readFileSync('kupa-sgura.html', 'utf8');
 
@@ -63,14 +64,35 @@ test('the group card opens in place: no "הרחב" toggle button, its body comes
   assert.match(groupCardSource, /if \(actions\.onToggle\) card\.appendChild\(renderGroupCardBody\(group, expanded\)\);/);
 });
 
-test('the open group card carries invite, table, details and settings, then the members one under another', () => {
-  const body = sourceBetween('  function renderGroupCardBody(group, expanded) {', '  // Collapsed "ארכיון');
-  assert.match(body, /groupActionButton\("invite", "צרף חבר", \(\) => shareGroupInvite\(group\)\)/);
-  assert.match(body, /groupActionButton\("table", "פתח שולחן", \(\) => \{ currentGroupId = groupId; toggleStartGamePanel\(\); \}, "primary"\)/);
-  assert.match(body, /groupActionButton\("details", "פירוט", \(\) => \{ resetStartGamePanel\(\); openGroupPreview\(groupId\); \}\)/);
-  assert.match(body, /groupActionButton\("settings", "הגדרות", \(\) => \{ currentGroupId = groupId; openGroupSettings\(\); \}\)/);
-  assert.match(body, /activeMembers\(collections\.groupMembers, groupId\)/);
-  assert.ok(body.indexOf('"games-group-actions"') < body.indexOf('"games-group-players"'), 'buttons sit above the member list');
+test('the open group card: table, invite and details tiles, settings in the corner, then the members with games played', () => {
+  const main = sourceBetween('  function renderGroupCardMain(content, group) {', '  // Details mode:');
+  assert.match(main, /label: "פתח שולחן", primary: true, onClick: \(\) => \{ currentGroupId = groupId; toggleStartGamePanel\(\); \}/);
+  assert.match(main, /\{ icon: "invite", label: "צרף חבר", onClick: \(\) => shareGroupInvite\(group\) \}/);
+  assert.match(main, /\{ icon: "details", label: "פירוט", onClick: \(\) => setGroupCardMode\("details", "games"\) \}/);
+  assert.doesNotMatch(main, /"הגדרות"/);
+  assert.match(main, /formatGamesPlayedCount\(count\)/);
+  assert.ok(main.indexOf('groupTileRow(') < main.indexOf('"games-group-players"'), 'tiles sit above the member list');
+  assert.match(groupCardSource, /setGroupCardMode\("settings", "details"\)/);
+});
+
+test('details mode swaps the tiles for back / games / ranking / stats; settings mode for back / details / invite / roles', () => {
+  const details = sourceBetween('  function renderGroupCardDetails(content, group) {', '  function renderGroupCardTimeline(');
+  ['"חזרה"', '"משחקים"', '"דירוג"', '"נתונים"'].forEach(label => assert.ok(details.includes(label), label));
+  const settings = sourceBetween('  function renderGroupCardSettings(content, group) {', '  function renderGroupCardDetailsForm(');
+  ['"חזרה"', '"פרטים"', '"הזמנה"', '"ניהול"'].forEach(label => assert.ok(settings.includes(label), label));
+  assert.match(settings, /if \(group\.isAdmin\) tiles\.push\(\{ key: "roles"/);
+});
+
+test('groupCardStats averages pots and durations, ignoring missing durations', () => {
+  const source = sourceBetween('  function groupCardStats(games) {', '  function renderGroupCardStats(');
+  const context = vm.createContext({});
+  vm.runInContext(source, context);
+  const stats = vm.runInContext('groupCardStats([{potSize:1000,durationMinutes:200},{potSize:1500,durationMinutes:null},{potSize:500,durationMinutes:100}])', context);
+  assert.equal(stats.count, 3);
+  assert.equal(stats.avgPot, 1000);
+  assert.equal(stats.maxPot, 1500);
+  assert.equal(stats.avgMinutes, 150);
+  assert.equal(vm.runInContext('groupCardStats([]).avgMinutes', context), null);
 });
 
 // ---------- quick actions: only the standalone-game action remains ----------

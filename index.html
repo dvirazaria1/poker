@@ -548,6 +548,43 @@
   .games-group-players { margin-top: 12px; }
   .games-group-player { display: flex; align-items: center; gap: 8px; min-height: 36px; border-bottom: 1px solid var(--line); font-size: 14px; font-weight: 500; }
   .games-group-player:last-child { border-bottom: 0; }
+  .games-group-player .games-member-name { flex: 1 1 auto; min-width: 0; }
+  .games-group-player-meta { color: var(--dim); font-size: 12px; font-weight: 300; }
+  .games-group-action.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .games-group-gear { width: 34px; height: 34px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; color: var(--dim); border-radius: 50%; transition: color .2s; }
+  .games-group-gear.on { color: var(--accent); }
+  .games-group-gear svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .games-group-view { margin-top: 12px; }
+  .games-group-view.centered { text-align: center; }
+  .games-group-view-title { display: block; margin: 0 0 6px; color: var(--dim); font-size: 12px; font-weight: 400; }
+  .games-group-timeline { border-inline-start: 2px solid var(--line); padding-inline-start: 12px; }
+  .games-group-timeline-item { position: relative; padding: 0 0 10px; font-size: 13px; }
+  .games-group-timeline-item:last-child { padding-bottom: 0; }
+  .games-group-timeline-item::before { content: ""; position: absolute; inset-inline-start: -17px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+  .games-group-timeline-item.latest::before { background: var(--accent); }
+  .games-group-timeline-meta { display: block; color: var(--dim); font-size: 12px; font-weight: 300; }
+  .games-group-bar-row { display: flex; align-items: center; gap: 8px; min-height: 26px; font-size: 13px; }
+  .games-group-bar-name { width: 64px; flex: 0 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .games-group-bar-track { flex: 1 1 auto; height: 14px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .games-group-bar { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+  .games-group-bar-count { width: 18px; text-align: center; font-size: 12px; }
+  .games-group-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .games-group-stat { border-radius: 10px; background: var(--line); padding: 9px 10px; }
+  .games-group-stat-label { display: block; color: var(--dim); font-size: 11px; }
+  .games-group-stat-value { display: block; font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .games-group-edit { display: flex; align-items: center; gap: 12px; }
+  .games-group-edit-avatar { width: 52px; height: 52px; font-size: 20px; border-style: dashed; }
+  .games-group-edit-field { flex: 1 1 auto; min-width: 0; }
+  .games-group-edit-field input { width: 100%; max-width: 100%; }
+  .games-group-edit-hint { margin: 6px 0 0; color: var(--dim); font-size: 11px; font-weight: 300; }
+  .games-group-danger { margin-top: 14px; padding-top: 6px; border-top: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; }
+  .games-group-danger-item { text-align: center; }
+  .games-group-role-head { display: flex; justify-content: space-between; color: var(--dim); font-size: 11px; margin-bottom: 2px; }
+  .games-group-role-row { gap: 10px; }
+  .games-switch { position: relative; width: 38px; height: 22px; flex: 0 0 auto; border-radius: 999px; background: var(--line); transition: background-color .2s; }
+  .games-switch::after { content: ""; position: absolute; top: 3px; inset-inline-start: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--dim); transition: inset-inline-start .2s, background-color .2s; }
+  .games-switch.on { background: var(--accent); }
+  .games-switch.on::after { inset-inline-start: 19px; background: var(--bg); }
   .games-group-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; display: flex; align-items: center; justify-content: center; background: var(--line); color: var(--dim); font-weight: 700; }
   .games-group-copy { flex: 1 1 auto; min-width: 0; }
   .games-group-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -1361,7 +1398,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 102</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 103</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -1639,6 +1676,10 @@
   // 2026-10-08: a dashboard group card opens in place (no modal). One card at a time; UI-only.
   let expandedGroupId = "";
   let expandedGroupJustOpened = false;
+  let expandedGroupMode = "main";   // "main" | "details" | "settings" -- what the open card shows
+  let expandedGroupTab = "";        // the selected tile inside details/settings
+  let groupCardArmed = "";          // archive/delete/leave armed for a second tap
+  let groupCardArmedTimeout = null;
   const expandedGroupGames = new Set();
   let state = load();
   let appView = "games";         // "friends" | "games" | "game" | "settle" | "profile" | "group"
@@ -6740,6 +6781,7 @@
       : () => pressThenOpen(card, actions.onOpen);
     head.addEventListener("click", activate);
     head.addEventListener("keydown", (e) => {
+      if (e.target !== head) return; // Enter on the gear inside the head is the gear's own click
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); }
     });
     if (group.avatarDataUrl) {
@@ -6762,6 +6804,19 @@
       copy.appendChild(el("span", "games-card-status" + (isSettlement ? " settlement" : ""), isSettlement ? "בסגירה" : "משחק פעיל"));
     }
     head.appendChild(copy);
+    // 2026-10-08: settings sit in the open card's corner; the gear swaps the body to settings.
+    if (expanded && group.isMember) {
+      const gear = el("button", "games-group-gear" + (expandedGroupMode === "settings" ? " on" : ""));
+      gear.type = "button";
+      gear.setAttribute("aria-label", "הגדרות קבוצה");
+      gear.setAttribute("aria-pressed", String(expandedGroupMode === "settings"));
+      gear.innerHTML = GROUP_ACTION_ICONS.settings;
+      gear.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (expandedGroupMode === "settings") setGroupCardMode("main"); else setGroupCardMode("settings", "details");
+      });
+      head.appendChild(gear);
+    }
     head.insertAdjacentHTML("beforeend", '<svg class="games-group-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg>');
     card.appendChild(head);
     if (actions.onToggle) card.appendChild(renderGroupCardBody(group, expanded));
@@ -6829,6 +6884,9 @@
     const id = String(groupId || "");
     if (expandedGroupId === id) { collapseGroupCard(); return; }
     resetStartGamePanel();
+    disarmGroupCardAction();
+    expandedGroupMode = "main";
+    expandedGroupTab = "";
     expandedGroupId = id;
     expandedGroupJustOpened = true;
     currentGroupId = id;
@@ -6837,7 +6895,7 @@
   }
   function collapseGroupCard() {
     const body = document.querySelector(".games-group-card.expanded .games-group-body.open");
-    const finish = () => { expandedGroupId = ""; resetStartGamePanel(); renderGamesDashboard(); };
+    const finish = () => { expandedGroupId = ""; expandedGroupMode = "main"; expandedGroupTab = ""; disarmGroupCardAction(); resetStartGamePanel(); renderGamesDashboard(); };
     if (!body) { finish(); return; }
     body.classList.remove("open");
     setTimeout(finish, 250);
@@ -6847,7 +6905,13 @@
     invite: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M19 8v6M16 11h6"></path></svg>',
     table: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="10" height="14" rx="2"></rect><path d="M10 4.5 12 4a2 2 0 0 1 2.4 1.4l3.3 11.6"></path></svg>',
     details: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg>',
-    settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"></path></svg>',
+    settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>',
+    back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>',
+    history: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>',
+    trophy: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0V4zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8"></path></svg>',
+    pencil: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"></path></svg>',
+    link: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path></svg>',
+    shield: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"></path></svg>',
   };
   function groupActionButton(kind, label, onClick, extraClass) {
     const btn = el("button", "games-group-action" + (extraClass ? " " + extraClass : ""));
@@ -6864,53 +6928,9 @@
     const bodyIn = el("div", "games-group-body-in");
     const content = el("div", "games-group-body-content");
     if (expanded) {
-      const collections = collectionsOf(state);
-      const actionsRow = el("div", "games-group-actions");
-      let reason = null;
-      if (group.isMember) {
-        actionsRow.appendChild(groupActionButton("invite", "צרף חבר", () => shareGroupInvite(group)));
-      }
-      // The table button follows renderGroupPrimaryAction's rules: enter my own open table, start
-      // one when the gate allows, otherwise stay disabled with the same reason it gives.
-      const slot = groupGameSlot(state, groupId);
-      const pickerOpen = startGameOpen && currentGroupId === groupId;
-      if (group.hasActiveGame && slot) {
-        actionsRow.appendChild(groupActionButton("table", group.activeGamePhase === "settlement" ? "המשך סגירה" : "כנס לשולחן", () => enterActiveGame(slot.gameId), "primary"));
-      } else if (group.hasActiveGame) {
-        actionsRow.appendChild(groupActionButton("table", "פתח שולחן", null));
-        reason = "יש משחק פעיל בקבוצה · אתה לא בשולחן הזה";
-      } else {
-        const gate = canStartGroupGame(collections, groupId, cloudGroupAggregates.openGames);
-        if (group.isMember && gate && gate.ok) {
-          const btn = groupActionButton("table", "פתח שולחן", () => { currentGroupId = groupId; toggleStartGamePanel(); }, "primary");
-          btn.setAttribute("aria-expanded", String(pickerOpen));
-          actionsRow.appendChild(btn);
-        } else {
-          actionsRow.appendChild(groupActionButton("table", "פתח שולחן", null));
-          const reasons = { "group-has-open-game": "יש כבר משחק פתוח בקבוצה", "group-archived": "הקבוצה בארכיון" };
-          reason = !group.isMember ? "אתה כבר לא חבר בקבוצה" : (gate && reasons[gate.reason]) || null;
-        }
-      }
-      actionsRow.appendChild(groupActionButton("details", "פירוט", () => { resetStartGamePanel(); openGroupPreview(groupId); }));
-      if (group.isMember) {
-        actionsRow.appendChild(groupActionButton("settings", "הגדרות", () => { currentGroupId = groupId; openGroupSettings(); }));
-      }
-      actionsRow.style.gridTemplateColumns = "repeat(" + actionsRow.children.length + ", minmax(0, 1fr))";
-      content.appendChild(actionsRow);
-      if (reason) content.appendChild(el("p", "games-group-action-reason", reason));
-      if (pickerOpen) content.appendChild(renderStartGamePanel());
-
-      const players = el("div", "games-group-players");
-      const members = activeMembers(collections.groupMembers, groupId);
-      members.forEach(member => {
-        const row = el("div", "games-group-player");
-        const name = el("span", "games-member-name", member.displayName);
-        if (member.role === "admin") name.appendChild(el("span", "games-member-tag", "מנהל"));
-        row.appendChild(name);
-        players.appendChild(row);
-      });
-      if (!members.length) players.appendChild(el("p", "games-empty", "אין חברים פעילים"));
-      content.appendChild(players);
+      if (expandedGroupMode === "details") renderGroupCardDetails(content, group);
+      else if (expandedGroupMode === "settings" && group.isMember) renderGroupCardSettings(content, group);
+      else renderGroupCardMain(content, group);
     }
     bodyIn.appendChild(content);
     body.appendChild(bodyIn);
@@ -6921,6 +6941,168 @@
       body.classList.add("open");
     }
     return body;
+  }
+
+  function setGroupCardMode(mode, tab) {
+    expandedGroupMode = mode;
+    expandedGroupTab = tab || "";
+    disarmGroupCardAction();
+    resetStartGamePanel();
+    renderGamesDashboard();
+  }
+  function setGroupCardTab(tab) {
+    expandedGroupTab = tab;
+    disarmGroupCardAction();
+    renderGamesDashboard();
+  }
+  // A row of square tiles; the one whose key matches `current` reads as selected.
+  function groupTileRow(tiles, current) {
+    const row = el("div", "games-group-actions");
+    tiles.forEach(tile => {
+      const btn = groupActionButton(tile.icon, tile.label, tile.onClick, tile.primary ? "primary" : (tile.key && tile.key === current ? "on" : ""));
+      if (tile.key) btn.setAttribute("aria-pressed", String(tile.key === current));
+      row.appendChild(btn);
+    });
+    row.style.gridTemplateColumns = "repeat(" + tiles.length + ", minmax(0, 1fr))";
+    return row;
+  }
+
+  // Main mode: table, invite and details tiles, then the members one under another with how
+  // many of the group's games each one played.
+  function renderGroupCardMain(content, group) {
+    const groupId = String(group.groupId || "");
+    const collections = collectionsOf(state);
+    const tiles = [];
+    let reason = null;
+    // The table tile follows renderGroupPrimaryAction's rules: enter my own open table, start
+    // one when the gate allows, otherwise stay disabled with the same reason it gives.
+    const slot = groupGameSlot(state, groupId);
+    const pickerOpen = startGameOpen && currentGroupId === groupId;
+    if (group.hasActiveGame && slot) {
+      tiles.push({ icon: "table", label: group.activeGamePhase === "settlement" ? "המשך סגירה" : "כנס לשולחן", primary: true, onClick: () => enterActiveGame(slot.gameId) });
+    } else if (group.hasActiveGame) {
+      tiles.push({ icon: "table", label: "פתח שולחן", onClick: null });
+      reason = "יש משחק פעיל בקבוצה · אתה לא בשולחן הזה";
+    } else {
+      const gate = canStartGroupGame(collections, groupId, cloudGroupAggregates.openGames);
+      if (group.isMember && gate && gate.ok) {
+        tiles.push({ icon: "table", label: "פתח שולחן", primary: true, onClick: () => { currentGroupId = groupId; toggleStartGamePanel(); } });
+      } else {
+        tiles.push({ icon: "table", label: "פתח שולחן", onClick: null });
+        const reasons = { "group-has-open-game": "יש כבר משחק פתוח בקבוצה", "group-archived": "הקבוצה בארכיון" };
+        reason = !group.isMember ? "אתה כבר לא חבר בקבוצה" : (gate && reasons[gate.reason]) || null;
+      }
+    }
+    if (group.isMember) tiles.push({ icon: "invite", label: "צרף חבר", onClick: () => shareGroupInvite(group) });
+    tiles.push({ icon: "details", label: "פירוט", onClick: () => setGroupCardMode("details", "games") });
+    const row = groupTileRow(tiles, "");
+    if (pickerOpen) row.firstChild.setAttribute("aria-expanded", "true");
+    content.appendChild(row);
+    if (reason) content.appendChild(el("p", "games-group-action-reason", reason));
+    if (pickerOpen) content.appendChild(renderStartGamePanel());
+
+    const played = new Map(resolveGroupLeaderboard(collections, groupId, cloudGroupAggregates).map(e => [e.displayName, e.gamesPlayed]));
+    const players = el("div", "games-group-players");
+    const members = activeMembers(collections.groupMembers, groupId);
+    members.forEach(member => {
+      const rowEl = el("div", "games-group-player");
+      const name = el("span", "games-member-name", member.displayName);
+      if (member.role === "admin") name.appendChild(el("span", "games-member-tag", "מנהל"));
+      rowEl.appendChild(name);
+      const count = played.get(member.displayName) || 0;
+      if (count) rowEl.appendChild(el("span", "games-group-player-meta", formatGamesPlayedCount(count)));
+      players.appendChild(rowEl);
+    });
+    if (!members.length) players.appendChild(el("p", "games-empty", "אין חברים פעילים"));
+    content.appendChild(players);
+  }
+
+  // Details mode: the same card, the tiles become back / games / ranking / stats and the member
+  // list gives way to the chosen view. No per-person money anywhere (Global Constraint 10).
+  function renderGroupCardDetails(content, group) {
+    const groupId = String(group.groupId || "");
+    const tab = expandedGroupTab || "games";
+    content.appendChild(groupTileRow([
+      { icon: "back", label: "חזרה", onClick: () => setGroupCardMode("main") },
+      { key: "games", icon: "history", label: "משחקים", onClick: () => setGroupCardTab("games") },
+      { key: "ranking", icon: "trophy", label: "דירוג", onClick: () => setGroupCardTab("ranking") },
+      { key: "stats", icon: "details", label: "נתונים", onClick: () => setGroupCardTab("stats") },
+    ], tab));
+    const collections = collectionsOf(state);
+    const games = resolveGroupGameSummaries(collections, groupId, cloudGroupAggregates);
+    const view = el("div", "games-group-view anim");
+    if (!games.length) {
+      view.appendChild(el("p", "games-empty", "עוד אין משחקים בקבוצה"));
+    } else if (tab === "ranking") {
+      renderGroupCardRanking(view, resolveGroupLeaderboard(collections, groupId, cloudGroupAggregates));
+    } else if (tab === "stats") {
+      renderGroupCardStats(view, games);
+    } else {
+      renderGroupCardTimeline(view, games);
+    }
+    content.appendChild(view);
+  }
+  function renderGroupCardTimeline(view, games) {
+    const list = el("div", "games-group-timeline");
+    games.forEach((game, idx) => {
+      const item = el("div", "games-group-timeline-item" + (idx === 0 ? " latest" : ""));
+      item.appendChild(el("b", "", formatShortGameDate(game.at)));
+      const winners = (Array.isArray(game.winnerNames) ? game.winnerNames : []).filter(Boolean);
+      const parts = [];
+      if (winners.length) parts.push((winners.length > 1 ? "ניצחו: " : "ניצח: ") + winners.join(", "));
+      parts.push(fmt(game.potSize));
+      parts.push(formatPlayerCount(game.playerCount));
+      item.appendChild(el("span", "games-group-timeline-meta", parts.join(" · ")));
+      list.appendChild(item);
+    });
+    view.appendChild(list);
+  }
+  function renderGroupCardRanking(view, entries) {
+    const rows = (Array.isArray(entries) ? entries : []).slice()
+      .sort((a, b) => (b.wins - a.wins) || (b.gamesPlayed - a.gamesPlayed) || a.displayName.localeCompare(b.displayName, "he"));
+    const maxWins = rows.reduce((m, r) => Math.max(m, r.wins || 0), 0);
+    view.appendChild(el("p", "games-group-view-title", "ניצחונות"));
+    if (!maxWins) { view.appendChild(el("p", "games-empty", "עוד אין ניצחונות")); return; }
+    rows.forEach((entry, idx) => {
+      const row = el("div", "games-group-bar-row");
+      const name = el("span", "games-group-bar-name", entry.displayName);
+      row.appendChild(name);
+      const track = el("span", "games-group-bar-track");
+      const bar = el("span", "games-group-bar");
+      bar.style.width = Math.round(((entry.wins || 0) / maxWins) * 100) + "%";
+      bar.style.opacity = String(Math.max(.3, 1 - idx * .18));
+      track.appendChild(bar);
+      row.appendChild(track);
+      row.appendChild(el("b", "games-group-bar-count", String(entry.wins || 0)));
+      row.setAttribute("aria-label", entry.displayName + ": " + formatWinsCount(entry.wins || 0) + " מתוך " + formatGamesPlayedCount(entry.gamesPlayed || 0));
+      view.appendChild(row);
+    });
+  }
+  // Pure: the numbers the stats view shows, from GroupGameSummary rows.
+  function groupCardStats(games) {
+    const list = Array.isArray(games) ? games : [];
+    const pots = list.map(g => Number(g.potSize) || 0);
+    const durations = list.map(g => g.durationMinutes).filter(m => Number.isFinite(m) && m > 0);
+    return {
+      count: list.length,
+      avgPot: pots.length ? Math.round(pots.reduce((a, b) => a + b, 0) / pots.length) : 0,
+      maxPot: pots.length ? Math.max(...pots) : 0,
+      avgMinutes: durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : null,
+    };
+  }
+  function renderGroupCardStats(view, games) {
+    const stats = groupCardStats(games);
+    const grid = el("div", "games-group-stats");
+    const tile = (label, value) => {
+      const box = el("div", "games-group-stat");
+      box.append(el("span", "games-group-stat-label", label), el("b", "games-group-stat-value", value));
+      grid.appendChild(box);
+    };
+    tile("משחקים", String(stats.count));
+    tile("קופה ממוצעת", fmt(stats.avgPot));
+    tile("הקופה הגדולה", fmt(stats.maxPot));
+    tile("משך ממוצע", stats.avgMinutes === null ? "—" : formatDuration(stats.avgMinutes));
+    view.appendChild(grid);
   }
 
   // Collapsed "ארכיון (N)" line under "הקבוצות שלי", shown only when archived-not-deleted groups
@@ -6987,6 +7169,10 @@
     // same pattern as renderGroupPage's enterStagger).
     const enterStagger = gamesPageEnterNext;
     gamesPageEnterNext = false;
+    // The open card's settings, invite and picker controls act on currentGroupId: keep it on that
+    // card while the dashboard is the screen (the group sheet and preview set their own).
+    const preview = document.getElementById("groupPreview");
+    if (appView === "games" && expandedGroupId && (!preview || preview.hidden)) currentGroupId = expandedGroupId;
     const box = document.getElementById("gamesHome");
     box.innerHTML = "";
     const inner = el("div", "games-home-in games-home-dash");
@@ -7113,6 +7299,169 @@
     inner.appendChild(renderGroupMembers(summary, activeMembers(collections.groupMembers, currentGroupId), formerMembers(collections.groupMembers, currentGroupId), summary.isAdmin));
     inner.appendChild(renderGroupHistory(gameSummaries));
     box.appendChild(inner);
+  }
+
+  // Settings mode (opened from the gear in the card's corner): back / details / invite / roles.
+  // Same rules as the settings overlay (refreshGroupSettings): any member invites and can leave;
+  // only an admin renames, changes the picture, manages roles, archives or deletes.
+  function renderGroupCardSettings(content, group) {
+    const groupId = String(group.groupId || "");
+    const tab = expandedGroupTab || "details";
+    const tiles = [
+      { icon: "back", label: "חזרה", onClick: () => setGroupCardMode("main") },
+      { key: "details", icon: "pencil", label: "פרטים", onClick: () => setGroupCardTab("details") },
+      { key: "invite", icon: "link", label: "הזמנה", onClick: () => setGroupCardTab("invite") },
+    ];
+    if (group.isAdmin) tiles.push({ key: "roles", icon: "shield", label: "ניהול", onClick: () => setGroupCardTab("roles") });
+    content.appendChild(groupTileRow(tiles, tab));
+    const view = el("div", "games-group-view anim" + (tab === "invite" ? " centered" : ""));
+    if (tab === "invite") {
+      const invite = renderGroupInvite(group, activeInvite(state.invites, groupId), group.isAdmin);
+      if (invite) view.appendChild(invite);
+      if (group.isAdmin) view.appendChild(renderAddMemberPanel());
+    } else if (tab === "roles" && group.isAdmin) {
+      renderGroupCardRoles(view, groupId);
+    } else {
+      renderGroupCardDetailsForm(view, group);
+    }
+    content.appendChild(view);
+  }
+
+  function renderGroupCardDetailsForm(view, group) {
+    const groupId = String(group.groupId || "");
+    const raw = (state.groups || []).find(g => g && g.id === groupId) || {};
+    const row = el("div", "games-group-edit");
+    const avatarBtn = el("button", "games-create-avatar games-group-edit-avatar");
+    avatarBtn.type = "button";
+    avatarBtn.setAttribute("aria-label", "שינוי תמונת הקבוצה");
+    if (raw.avatarDataUrl) {
+      const img = document.createElement("img");
+      img.src = raw.avatarDataUrl;
+      img.alt = "";
+      avatarBtn.appendChild(img);
+    } else {
+      avatarBtn.textContent = String(raw.name || "?").slice(0, 1);
+    }
+    avatarBtn.disabled = !group.isAdmin;
+    const file = document.createElement("input");
+    file.type = "file";
+    file.accept = "image/*";
+    file.hidden = true;
+    avatarBtn.addEventListener("click", () => { if (group.isAdmin) file.click(); });
+    file.addEventListener("change", async () => {
+      const picked = file.files && file.files[0];
+      file.value = "";
+      if (!picked) return;
+      try {
+        const dataUrl = await resizeAvatarImage(picked);
+        if (!setGroupAvatar(state.groups, groupId, dataUrl)) return;
+        save();
+        renderGroupSurface();
+      } catch (err) {}
+    });
+    const field = el("label", "games-group-edit-field");
+    field.appendChild(el("span", "games-group-view-title", "שם הקבוצה"));
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.maxLength = 40;
+    nameInput.value = raw.name || "";
+    nameInput.disabled = !group.isAdmin;
+    nameInput.addEventListener("change", () => {
+      if (!renameGroup(state.groups, groupId, nameInput.value)) { shakeEl(nameInput); nameInput.value = raw.name || ""; return; }
+      save();
+      renderGroupSurface();
+    });
+    nameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); nameInput.blur(); } });
+    field.appendChild(nameInput);
+    row.append(avatarBtn, file, field);
+    view.appendChild(row);
+    if (group.isAdmin) view.appendChild(el("p", "games-group-edit-hint", "לחץ על התמונה כדי להחליף אותה"));
+
+    const actions = el("div", "games-group-danger");
+    if (group.isAdmin) {
+      actions.appendChild(groupCardArmedButton("archive", "העבר לארכיון", "בטוח? הקבוצה תעבור לארכיון", group.hasActiveGame ? "סגור קודם את המשחק הפעיל" : null, () => {
+        if (!archiveGroup(state.groups, groupId, new Date().toISOString())) return;
+        save();
+        expandedGroupId = "";
+        renderGamesDashboard();
+      }));
+      actions.appendChild(groupCardArmedButton("delete", "מחק קבוצה", "בטוח? ההיסטוריה הקבוצתית תוסתר", group.hasActiveGame ? "סגור קודם את המשחק הפעיל" : null, () => {
+        if (!deleteGroup(state.groups, groupId, new Date().toISOString())) return;
+        save();
+        expandedGroupId = "";
+        renderGamesDashboard();
+      }, true));
+    }
+    const membership = findMyMembership(state.groupMembers, groupId, me);
+    if (membership) {
+      const lastAdmin = isLastActiveAdmin(state.groupMembers, membership.id);
+      actions.appendChild(groupCardArmedButton("leave", "עזוב קבוצה", "בטוח?", lastAdmin ? "העבר ניהול לחבר אחר קודם" : null, () => {
+        if (!leaveGroup(state.groupMembers, groupId, me, new Date().toISOString())) return;
+        save();
+        expandedGroupId = "";
+        renderGamesDashboard();
+      }, true));
+    }
+    if (actions.childNodes.length) view.appendChild(actions);
+  }
+
+  // Two-step button, same as the overlay's archive/delete/leave: the first tap arms it for 4s
+  // and changes its label, the second one acts. A blocked one stays disabled with its reason.
+  function groupCardArmedButton(key, label, armedLabel, blockedReason, onConfirm, danger) {
+    const wrap = el("div", "games-group-danger-item");
+    const armed = groupCardArmed === key;
+    const btn = el("button", "set-flat" + (danger ? " danger" : "") + (armed ? " armed" : ""), armed ? armedLabel : label);
+    btn.type = "button";
+    btn.disabled = !!blockedReason;
+    btn.addEventListener("click", () => {
+      if (blockedReason) return;
+      if (groupCardArmed !== key) {
+        disarmGroupCardAction();
+        groupCardArmed = key;
+        groupCardArmedTimeout = setTimeout(() => { groupCardArmed = ""; renderGamesDashboard(); }, 4000);
+        renderGamesDashboard();
+        return;
+      }
+      disarmGroupCardAction();
+      onConfirm();
+    });
+    wrap.appendChild(btn);
+    if (blockedReason) wrap.appendChild(el("p", "games-primary-reason", blockedReason));
+    return wrap;
+  }
+  function disarmGroupCardAction() {
+    clearTimeout(groupCardArmedTimeout);
+    groupCardArmed = "";
+    groupCardArmedTimeout = null;
+  }
+
+  // Roles: one switch per active member (on = admin). The group's last admin stays on, with a
+  // note instead of a switch that would refuse; an admin can still remove anyone else (red X).
+  function renderGroupCardRoles(view, groupId) {
+    const members = activeMembers(collectionsOf(state).groupMembers, groupId);
+    const head = el("div", "games-group-role-head");
+    head.append(el("span", "", "חבר"), el("span", "", "מנהל"));
+    view.appendChild(head);
+    members.forEach(member => {
+      const row = el("div", "games-group-player games-group-role-row");
+      row.appendChild(el("span", "games-member-name", member.displayName));
+      const isAdmin = member.role === "admin";
+      const lastAdmin = isAdmin && isLastActiveAdmin(members, member.id);
+      if (!membershipMatchesUser(member, me) && !lastAdmin) row.appendChild(renderRemoveMemberButton(member));
+      if (lastAdmin) {
+        row.appendChild(el("span", "games-group-player-meta", "המנהל האחרון"));
+      } else {
+        const sw = el("button", "games-switch" + (isAdmin ? " on" : ""));
+        sw.type = "button";
+        sw.setAttribute("role", "switch");
+        sw.setAttribute("aria-checked", String(isAdmin));
+        sw.setAttribute("aria-label", member.displayName + " מנהל");
+        sw.addEventListener("click", () => isAdmin ? demoteMember(member.groupId, member.id) : promoteMember(member.groupId, member.id));
+        row.appendChild(sw);
+      }
+      view.appendChild(row);
+    });
+    if (!members.length) view.appendChild(el("p", "games-empty", "אין חברים פעילים"));
   }
 
   function renderGroupSurface() {
