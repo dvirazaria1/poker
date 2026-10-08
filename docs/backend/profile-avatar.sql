@@ -1,4 +1,7 @@
 -- profile-avatar.sql — OPTIONAL hardening for the profile picture (DESIGN.md "תוספת — תמונת פרופיל").
+-- APPLIED to production 2026-10-08 (migration profile_avatar_url_shape): pre-check found 0 violating
+-- rows of 4 profiles; verified live -- a malformed value is refused, a valid one accepted (both
+-- probes rolled back, no data changed).
 -- NOT required for the feature: the client already writes and reads profiles.avatar_url, and every
 -- reader runs parseAvatar() before rendering, so a malformed value shows the name's first letter.
 --
