@@ -12116,9 +12116,9 @@
 
   // ---------- connecting game ----------
   // The "connecting" state of every server-backed control (owner pick, 2026-10-08): instead of a
-  // loading label, a tiny hold'em hand plays out -- riffle, two cards to each of four seats, the
-  // flop, the hands shown -- and the caption follows the hand. "mini" is the riffle alone beside
-  // "רגע, מתחברים". One instance per surface key: renderConnectingSlot re-appends the same node on
+  // loading label, a tiny hold'em hand plays out -- riffle, two cards to each of four seats, a
+  // five-card board, the hands shown -- above one quiet line, "רגע, מתחברים לשרת". "mini" is the
+  // riffle alone beside the same line. One instance per surface key: renderConnectingSlot re-appends the same node on
   // every render and the Web Animations keep running, so a render never restarts the hand. Once the
   // gate leaves "connecting" the cards gather, the slot folds and removes itself; the real controls
   // are live already. Spec: docs/superpowers/specs/2026-10-08-connecting-game-design.md
@@ -12162,8 +12162,10 @@
     return [deck[0] + (left ? -spread : spread), deck[1] - 4 - k * 1.5, left ? -13 : 13];
   }
   function slotAlive(slot) { return !slot.leaving && slot.node.isConnected && slot.node.getClientRects().length > 0; }
-  async function dealSay(slot, text) {
-    const t = navigator.onLine === false ? "אין חיבור לאינטרנט" : text;
+  const DEAL_CAPTION = "רגע, מתחברים לשרת";
+  // The one line under the hand; it only changes when the device itself is offline.
+  async function dealCaption(slot) {
+    const t = navigator.onLine === false ? "אין חיבור לאינטרנט" : DEAL_CAPTION;
     if (slot.cap.textContent === t) return;
     await dealMove(slot.cap, [{ opacity: 1 }, { opacity: 0 }], { d: 120 });
     slot.cap.textContent = t;
@@ -12217,11 +12219,10 @@
     for (;;) {
       c.hole.concat(c.board).forEach(card => { dealBack(card); dealPlace(card, deck[0], deck[1], 0, 0); card.style.zIndex = ""; });
       c.base.forEach(card => dealPlace(card, deck[0], deck[1], 0, 0));
-      dealSay(slot, "מערבבים");
+      dealCaption(slot);
       if (!(await dealRiffle(slot, deck, 17))) return;
       c.base.forEach((card, k) => dealPlace(card, deck[0], deck[1] - k, 0, 1));
       c.riffle.forEach(card => dealPlace(card, deck[0], deck[1], 0, 0));
-      dealSay(slot, "מחלקים");
       for (let i = 0; i < 8; i++) {
         const p = dealHolePos(i);
         c.hole[i].style.zIndex = String(20 + i);
@@ -12235,7 +12236,6 @@
       if (!slotAlive(slot)) return;
       // The flop, the casino way: three cards leave the deck as one stack, turn over together and
       // are fanned out; then the turn and the river, one card each, turned in place.
-      dealSay(slot, "פלופ");
       const flop = c.board.slice(0, 3), at = DEAL_BOARD[0];
       await Promise.all(flop.map((card, k) => {
         card.style.zIndex = String(40 + k);
@@ -12246,10 +12246,9 @@
       await dealWait(160);
       // fan the flop out: the top card travels furthest
       await Promise.all(flop.map((card, k) => dealMove(card, [{ transform: dealT(at[0], at[1] - k * 0.8, 0) }, { transform: dealT(DEAL_BOARD[k][0], DEAL_BOARD[k][1], 0) }], { d: 360, e: "cubic-bezier(.3,.7,.2,1)" })));
-      for (const [i, name] of [[3, "טרן"], [4, "ריבר"]]) {
+      for (const i of [3, 4]) {
         await dealWait(420);
         if (!slotAlive(slot)) return;
-        dealSay(slot, name);
         c.board[i].style.zIndex = String(40 + i);
         await dealMove(c.board[i], [{ transform: dealT(deck[0], deck[1], 0), opacity: 1 }, { transform: dealT(DEAL_BOARD[i][0], DEAL_BOARD[i][1], 0), opacity: 1 }], { d: 320 });
         await dealWait(140);
@@ -12257,7 +12256,6 @@
       }
       await dealWait(500);
       if (!slotAlive(slot)) return;
-      dealSay(slot, "פותחים קלפים");
       for (let s = 0; s < 4; s++) {
         const a = dealHolePos(s), b = dealHolePos(s + 4);
         dealTurn(c.hole[s], a[0], a[1], a[2], dealRandomSuit());
@@ -12272,7 +12270,6 @@
       });
       await dealWait(1100);
       if (!slotAlive(slot)) return;
-      dealSay(slot, "רגע, מתחברים");
       await dealGather(c.hole.concat(c.board), deck);
       await dealWait(250);
       if (!slotAlive(slot)) return;
@@ -12280,7 +12277,7 @@
   }
   async function runMiniRiffle(slot) {
     for (;;) {
-      dealSay(slot, "רגע, מתחברים");
+      dealCaption(slot);
       if (!(await dealRiffle(slot, [0, 0], 9))) return;
       await dealWait(350);
       if (!slotAlive(slot)) return;
@@ -12299,7 +12296,7 @@
     node.setAttribute("aria-label", "מתחברים לשרת");
     const stage = el("div", "connecting-stage");
     stage.setAttribute("aria-hidden", "true");
-    const cap = el("span", "connecting-cap", "רגע, מתחברים");
+    const cap = el("span", "connecting-cap", DEAL_CAPTION);
     cap.setAttribute("aria-hidden", "true");
     node.append(stage, cap);
     const slot = { node, kind, stage, cap, cards: {}, running: false, leaving: false, seenAt: 0, beat: 0 };
