@@ -229,7 +229,7 @@ test('rows are a 34px avatar ring and a name; the stagger only plays on entering
 });
 
 test('the empty state: decorative rings, a headline, the benefit line, one primary invite, then a quiet search link', () => {
-  const empty = sourceBetween('  function renderFriendsEmpty(sec, online)', '  function renderFriendsList(');
+  const empty = sourceBetween('  function renderFriendsEmpty(sec, gate)', '  function renderFriendsList(');
   assert.match(empty, /rings\.setAttribute\("aria-hidden", "true"\);/);
   assert.match(empty, /el\("h2", "friends-title", "עוד אין חברים"\)/);
   assert.match(empty, /el\("p", "friends-lead", "חברים שמצטרפים דרך קישור זמינים מיד לבחירה בכל משחק וקבוצה\."\)/);
@@ -247,7 +247,7 @@ test('the invite action keeps its loading and cached-link labels in both places'
 });
 
 test('with data: title, incoming requests, the heading with both add actions, then friends, then outgoing', () => {
-  const list = sourceBetween('  function renderFriendsList(sec, data, online, enter)', '  function renderFriendsPage()');
+  const list = sourceBetween('  function renderFriendsList(sec, data, gate, enter)', '  function renderFriendsPage()');
   const steps = [
     'el("h2", "friends-title", "החברים שלך")',
     'renderFriendRows(sec, data.incoming.map(f => f.requester), "incoming"',

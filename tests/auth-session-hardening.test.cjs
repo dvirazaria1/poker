@@ -121,7 +121,7 @@ test('invite notices are re-rendered on backend readiness and on the initial nul
   assert.match(html, /initAuth\(\);\s*refreshInviteNotices\(\);/, 'bootBackend refreshes the notices');
   const nullBranch = authSource.slice(authSource.indexOf('if (!user) {'), authSource.indexOf('authAppliedUserId === user.id'));
   assert.equal((nullBranch.match(/refreshInviteNotices\(\)/g) || []).length, 2, 'both null-session exits refresh');
-  assert.match(html, /if \(!supabase\) joinNoticeParts\(\)\.notice\.hidden = true;\s*else closeJoinNotice\(\);/,
+  assert.match(html, /if \(gateNow\(\) === "connecting"\) joinNoticeParts\(\)\.notice\.hidden = true;\s*else closeJoinNotice\(\);/,
     'dismissing the "no backend" notice must not discard the pending token');
 });
 
@@ -144,4 +144,12 @@ test("'לא עכשיו' on a friend invite before signing in keeps the invite fo
   const show = html.slice(html.indexOf("  function showFriendNotice(token) {"), html.indexOf("  function maybeRunPendingFriendInvite()"));
   assert.match(show, /ui\.laterBtn\.addEventListener\("click", \(\) => \{\s*if \(cloudMode\(\)\) \{ closeFriendNotice\(\); return; \}\s*friendNoticeParts\(\)\.notice\.hidden = true;/);
   assert.doesNotMatch(show, /ui\.laterBtn\.addEventListener\("click", closeFriendNotice\)/);
+});
+
+test('initAuth marks the first session read as answered, so "connecting" can end', async () => {
+  const env = makeEnv();
+  assert.equal(env.get('authSessionChecked'), false);
+  env.get('initAuth')();
+  await new Promise(r => setImmediate(r));
+  assert.equal(env.get('authSessionChecked'), true);
 });

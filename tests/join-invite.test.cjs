@@ -147,8 +147,8 @@ test('the ?join= query is stripped only by the resolve path, not at boot', () =>
     'boot must not strip the URL before the join flow resolves');
 });
 
-test('with no SDK the notice says the connection is down, never "coming soon"', () => {
-  assert.match(joinSource, /if \(!supabase\) \{\n      ui\.note\.textContent = "אין חיבור כרגע, נסו שוב בעוד רגע";/);
+test('while connecting the notice shows the game and keeps the token; never "coming soon"', () => {
+  assert.match(joinSource, /if \(gate === "connecting"\) \{\n      ui\.note\.textContent = "";\n      ui\.joinBtn\.hidden = true;\n      ui\.continueBtn\.hidden = false;/);
   assert.doesNotMatch(joinSource, /SERVER_NOTE/);
 });
 

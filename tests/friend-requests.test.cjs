@@ -180,10 +180,11 @@ test('the whole feature is gated by cloudMode()', () => {
   assert.match(html, /const profileId = authUser && authUser\.id;\n    return \{\n      userId: keptUserId\(profileId\),/);
   // signed out keeps the screen's shape: faint disabled actions + ACCOUNT_NOTE
   const page = sourceBetween('  function friendInviteLabel(short)', '  function renderProfile()');
-  assert.match(page, /const online = cloudMode\(\);/);
+  assert.match(page, /const gate = gateNow\(\);/);
+  assert.equal((page.match(/const online = gate === "online";/g) || []).length, 2);
   assert.match(page, /btn\.disabled = !online;/);
   assert.match(page, /btn\.disabled = !online \|\| friendInviteSharing;/);
-  assert.equal((page.match(/if \(online\) renderAddFriendPanel\((wrap|sec)\);\n\s+else (wrap|sec)\.appendChild\(el\("p", "friends-note", ACCOUNT_NOTE\)\);/g) || []).length, 2);
+  assert.equal((page.match(/if \(online\) renderAddFriendPanel\((wrap|sec)\);\n\s+renderConnectingSlot\((wrap|sec), "friends(-list)?", "(full|mini)", gate\);\n\s+if \(gate === "signedOut"\) (wrap|sec)\.appendChild\(el\("p", "friends-note", ACCOUNT_NOTE\)\);/g) || []).length, 2);
   // the row actions only exist online
   assert.match(page, /online \? \(i => \{/);
 });
