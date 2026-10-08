@@ -185,15 +185,13 @@ test('friends are a primary screen and are no longer rendered inside profile', (
   const profileSource = html.slice(html.indexOf('  function renderProfile()'), html.indexOf('  // Shared tail of "add a player'));
   assert.doesNotMatch(profileSource, /renderFriendGroup\(/);
   assert.doesNotMatch(profileSource, /friendRequestsFor\(/);
-  // Design round (row 22): the empty state states the fact, and the single shared SERVER_NOTE
-  // constant under the disabled button carries the "needs a backend" wording for all five places.
+  // 2026-10-08 thin rings: the empty state states the fact; search and invite are disabled
+  // without a session, and ACCOUNT_NOTE says what to do.
   assert.match(html, /עוד אין חברים/);
-  assert.match(html, /"חפש לפי שם או מייל"/);
-  // The button is live with a session and disabled without one; the shared note is what the
-  // signed-out screen still shows (see tests/friend-requests.test.cjs for the wiring).
-  assert.match(html, /addFriendBtn\.disabled = !online;/);
-  assert.match(html, /addFriendBtn\.setAttribute\("aria-disabled", online \? "false" : "true"\);/);
-  assert.match(html, /el\("p", "friend-helper", ACCOUNT_NOTE\)/);
+  assert.match(html, /"חיפוש לפי שם או מייל"/);
+  assert.match(html, /btn\.disabled = !online;/);
+  assert.match(html, /btn\.setAttribute\("aria-disabled", online \? "false" : "true"\);/);
+  assert.match(html, /el\("p", "friends-note", ACCOUNT_NOTE\)/);
 });
 
 test('render routes and controls the standalone friends screen', () => {
@@ -215,48 +213,56 @@ test('createFriendRequest and respondToFriendRequest each have exactly one UI ca
   assert.match(html, /if \(!respondToFriendRequest\(state\.friendships \|\| \[\], id, myFriendRef\(\), accept, new Date\(\)\.toISOString\(\)\)\) return;/);
 });
 
-// ---------- empty-state redesign (researched empty state, one primary action) ----------
+// ---------- thin-rings design (2026-10-08) ----------
 
-const friendsPageSource = sourceBetween('  function renderFriendsPage()', '  function renderProfile()');
+const friendsScreenSource = sourceBetween('  function renderFriendRows(', '  function renderProfile()');
 
-test('the empty state (no friends, no pending requests) renders a headline, a benefit line, and promotes the share link to the page\'s one primary action', () => {
-  const emptyBranch = friendsPageSource.slice(
-    friendsPageSource.indexOf('if (!hasFriendData) {'),
-    friendsPageSource.indexOf('} else {')
-  );
-  assert.match(emptyBranch, /el\("h2", "friends-hero-title", "עוד אין חברים\?"\)/);
-  assert.match(emptyBranch, /el\("p", "friends-hero-benefit",/);
-  // the share-link action is the page's real .btn-primary; add-by-name is the quieter .btn-quiet
-  // secondary (same weighting the login screen already uses for its lead vs. skip action).
-  assert.match(friendsPageSource, /el\("button", "btn-primary friends-share-btn", friendInviteSharing \? "יוצר קישור…"\s+: \(friendInviteLinkCache[^;]*"שתף את קישור ההזמנה" : "צור קישור הזמנה"\)\)/);
-  assert.match(friendsPageSource, /el\("button", "btn-quiet friends-add-toggle", "חפש לפי שם או מייל"\)/);
+test('rows are a 34px avatar ring and a name; the stagger only plays on entering the screen', () => {
+  const rows = sourceBetween('  function renderFriendRows(parent, refs, kind, metaLabel, actionsFor, enter)', '  // The inline add-friend panel');
+  assert.match(rows, /el\("div", "friend-row is-" \+ kind \+ \(enter \? " anim" : ""\)\)/);
+  assert.match(rows, /if \(enter\) row\.style\.animationDelay = \(i \* 45\) \+ "ms";/);
+  assert.match(rows, /renderAvatarEl\(cachedAvatar\(ref\.userId\), 34, ref\.displayName \|\| "", ref\.userId \|\| ""\)/);
+  assert.match(html, /friendsPageEnterNext = nextView === "friends";/);
+  assert.match(html, /\.friend-row \.pavatar-initial \{[^}]*background: transparent;/);
+  assert.match(html, /\.friend-row\.is-incoming \.pavatar \{ border-color: var\(--accent\); \}/);
+  assert.match(html, /\.friend-row\.is-outgoing \.pavatar \{ border-style: dashed; \}/);
 });
 
-test('when there is data, incoming and outgoing requests are rendered before the accepted-friends list', () => {
-  const populatedBranch = friendsPageSource.slice(
-    friendsPageSource.indexOf('} else {'),
-    friendsPageSource.indexOf('// Primary path')
-  );
-  const incomingIdx = populatedBranch.indexOf('renderFriendGroup(friendsSec, "בקשות שהתקבלו"');
-  const outgoingIdx = populatedBranch.indexOf('renderFriendGroup(friendsSec, "בקשות שנשלחו"');
-  const friendsIdx = populatedBranch.indexOf('renderFriendGroup(friendsSec, onlyFriends ? "" : "חברים"');
-  assert.ok(incomingIdx >= 0, 'incoming requests must render');
-  assert.ok(outgoingIdx > incomingIdx, 'outgoing requests must follow incoming requests');
-  assert.ok(friendsIdx > outgoingIdx, 'the friends list must follow both request groups, never lead them');
+test('the empty state: decorative rings, a headline, the benefit line, one primary invite, then a quiet search link', () => {
+  const empty = sourceBetween('  function renderFriendsEmpty(sec, online)', '  function renderFriendsList(');
+  assert.match(empty, /rings\.setAttribute\("aria-hidden", "true"\);/);
+  assert.match(empty, /el\("h2", "friends-title", "עוד אין חברים"\)/);
+  assert.match(empty, /el\("p", "friends-lead", "חברים שמצטרפים דרך קישור זמינים מיד לבחירה בכל משחק וקבוצה\."\)/);
+  const invite = empty.indexOf('makeFriendInviteBtn("btn-primary friends-share-btn", false, online)');
+  const search = empty.indexOf('makeFriendSearchBtn("friends-search-link", online, "חיפוש לפי שם או מייל")');
+  assert.ok(invite >= 0 && search > invite, 'the primary invite comes first, the search link under it');
+  assert.equal((empty.match(/btn-primary/g) || []).length, 1, 'one primary action only');
 });
 
-test('the share action is appended before the add-by-name action, keeping the primary path first in reading and tab order', () => {
-  const shareAppendIdx = friendsPageSource.indexOf('friendsSec.appendChild(inviteMeBtn)');
-  const addAppendIdx = friendsPageSource.indexOf('friendsSec.appendChild(addFriendBtn)');
-  assert.ok(shareAppendIdx >= 0 && addAppendIdx > shareAppendIdx);
+test('the invite action keeps its loading and cached-link labels in both places', () => {
+  const label = sourceBetween('  function friendInviteLabel(short)', '  function makeFriendInviteBtn(');
+  assert.match(label, /if \(friendInviteSharing\) return "יוצר קישור…";/);
+  assert.match(label, /cached \? "\+ שתף קישור" : "\+ הזמן"/);
+  assert.match(label, /cached \? "שתף את קישור ההזמנה" : "הזמן חבר בקישור"/);
 });
 
-test('the empty-state redesign changes presentation only -- no localStorage access inside renderFriendsPage', () => {
-  assert.doesNotMatch(friendsPageSource, /localStorage\./);
+test('with data: title, incoming requests, the heading with both add actions, then friends, then outgoing', () => {
+  const list = sourceBetween('  function renderFriendsList(sec, data, online, enter)', '  function renderFriendsPage()');
+  const steps = [
+    'el("h2", "friends-title", "החברים שלך")',
+    'renderFriendRows(sec, data.incoming.map(f => f.requester), "incoming"',
+    'makeFriendSearchBtn("friends-icon-btn", online, "")',
+    'makeFriendInviteBtn("friends-invite-link", true, online)',
+    'renderFriendRows(sec, data.friends, "friend", "", null, enter)',
+    'renderFriendRows(sec, data.outgoing.map(f => f.addressee), "outgoing", "ממתין לאישור"',
+  ].map(s => list.indexOf(s));
+  steps.forEach((idx, i) => assert.ok(idx >= 0, `missing step ${i}`));
+  for (let i = 1; i < steps.length; i++) assert.ok(steps[i] > steps[i - 1], `step ${i} out of order`);
+  assert.match(list, /el\("p", "friends-lead", "מי שמצטרף זמין לכל משחק וקבוצה"\)/);
+  assert.match(list, /n === 0 \? "חברים" : n === 1 \? "חבר אחד" : n \+ " חברים"/);
+  assert.match(list, /count === 1 \? "בקשה חדשה" : count \+ " בקשות חדשות"/);
 });
 
-test('a friends page with data has a title, skips empty groups, and lets the lists span the column', () => {
-  assert.match(friendsPageSource, /el\("h2", "friends-hero-title friends-page-title", "החברים שלך"\)/);
-  assert.match(html, /function renderFriendGroup\(parent, title, refs, metaLabel, actionsFor, withAvatars\) \{\n    if \(!refs\.length\) return;/);
-  assert.match(html, /\.friends-page \.debt-group \{ align-self: stretch; \}/);
+test('the redesign is presentation only -- no localStorage access on the friends screen', () => {
+  assert.doesNotMatch(friendsScreenSource, /localStorage\./);
 });

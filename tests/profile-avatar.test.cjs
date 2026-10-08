@@ -131,10 +131,10 @@ test('friends fetch in one query, back off after a failure, and are swapped in p
 });
 
 test('the friends lists lead every row with an avatar; settings and the profile header open the editor', () => {
-  const group = between('  function renderFriendGroup(', '  // The inline add-friend panel');
-  assert.match(group, /if \(withAvatars\) row\.appendChild\(renderAvatarEl\(cachedAvatar\(ref\.userId\), 44, ref\.displayName \|\| "", ref\.userId \|\| ""\)\);/);
-  const page = between('  function renderFriendsPage() {', '  function renderProfile() {');
-  assert.equal((page.match(/, true\);/g) || []).length, 3, 'incoming, outgoing and friends all pass withAvatars');
+  const rows = between('  function renderFriendRows(', '  // The inline add-friend panel');
+  assert.match(rows, /row\.appendChild\(renderAvatarEl\(cachedAvatar\(ref\.userId\), 34, ref\.displayName \|\| "", ref\.userId \|\| ""\)\);/);
+  const page = between('  function renderFriendsList(', '  function renderProfile() {');
+  assert.equal((page.match(/renderFriendRows\(sec, /g) || []).length, 3, 'incoming, friends and outgoing all render through renderFriendRows');
   assert.match(page, /ensureAvatars\(/);
 
   assert.match(html, /<button type="button" class="pavatar-edit" id="setAvatar" aria-label="עריכת תמונת הפרופיל"><\/button>/);

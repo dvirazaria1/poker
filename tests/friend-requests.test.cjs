@@ -178,12 +178,12 @@ test('the whole feature is gated by cloudMode()', () => {
   assert.match(html, /async function lookupFriendProfile\(parsed\) \{\n    if \(!supabase \|\| !authUser\) return null;/);
   // my own ref never invents a profile id: it validates the session's through keptUserId()
   assert.match(html, /const profileId = authUser && authUser\.id;\n    return \{\n      userId: keptUserId\(profileId\),/);
-  // signed out keeps today's behaviour: disabled button + the shared server note
-  const page = sourceBetween('  function renderFriendsPage()', '  function renderProfile()');
+  // signed out keeps the screen's shape: faint disabled actions + ACCOUNT_NOTE
+  const page = sourceBetween('  function friendInviteLabel(short)', '  function renderProfile()');
   assert.match(page, /const online = cloudMode\(\);/);
-  assert.match(page, /addFriendBtn\.disabled = !online;/);
-  assert.match(page, /if \(!online\) friendsSec\.appendChild\(el\("p", "friend-helper", ACCOUNT_NOTE\)\);/);
-  assert.match(page, /if \(online\) renderAddFriendPanel\(friendsSec\);/);
+  assert.match(page, /btn\.disabled = !online;/);
+  assert.match(page, /btn\.disabled = !online \|\| friendInviteSharing;/);
+  assert.equal((page.match(/if \(online\) renderAddFriendPanel\((wrap|sec)\);\n\s+else (wrap|sec)\.appendChild\(el\("p", "friends-note", ACCOUNT_NOTE\)\);/g) || []).length, 2);
   // the row actions only exist online
   assert.match(page, /online \? \(i => \{/);
 });

@@ -258,7 +258,7 @@ test('a member row shows the remove X only when it is legal: admin viewer, not s
 // ---------- D4: debt direction colour + one "ממתין לתשלום" wording ----------
 
 test('debt amounts are coloured by direction and both lists read "ממתין לתשלום"', () => {
-  const source = sourceBetween('  function renderDebtGroup(parent, title, debts, creditorView, showTitle = true) {', '  // Flat .debt-row-style rows');
+  const source = sourceBetween('  function renderDebtGroup(parent, title, debts, creditorView, showTitle = true) {', '  async function lookupFriendProfile(parsed)');
   assert.match(source, /debt-amount" \+ \(creditorView \? " pos" : " neg"\)/);
   assert.match(source, /ממתין לתשלום/);
   assert.doesNotMatch(source, /"ממתין"/);
