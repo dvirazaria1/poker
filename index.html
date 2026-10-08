@@ -669,9 +669,12 @@
   .gh-cta { width: 100%; min-height: 56px; padding: 11px 12px; display: flex; align-items: center; gap: 10px; border: 1.5px dashed var(--accent); border-radius: 16px; color: var(--accent); font-size: 14px; font-weight: 700; text-align: start; transition: background-color .2s; }
   .gh-cta-ic { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 50%; border: 1.5px dashed var(--accent); display: flex; align-items: center; justify-content: center; }
   .gh-cta-ic svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
-  .gh-ghost { margin-top: 8px; padding: 11px 12px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 16px; }
-  .gh-ghost-av { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 50%; background: var(--line); }
+  /* Owner, 2026-10-08: ghost cards a touch stronger (a dashed --faint edge and ring, like the
+     friends screen's) and always there -- the list is topped up to four cards (renderGroupGhosts). */
+  .gh-ghost { margin-top: 8px; padding: 11px 12px; display: flex; align-items: center; gap: 10px; border: 1px dashed var(--faint); border-radius: 16px; }
+  .gh-ghost-av { width: 32px; height: 32px; flex: 0 0 auto; box-sizing: border-box; border-radius: 50%; border: 1px dashed var(--faint); }
   .gh-ghost-line { height: 8px; width: 55%; border-radius: 5px; background: var(--line); }
+  .games-group-list .gh-ghost { margin-top: 0; }
 
   /* create-group inline panel — same grid-collapse transition as .pmenu */
   .games-create-panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .28s ease; margin-top: 14px; }
@@ -1782,7 +1785,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 137</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 138</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -7324,6 +7327,22 @@
     });
   }
 
+  // Always at least four cards above "משחק ללא קבוצה" (owner, 2026-10-08): after the first-group
+  // card when there is no group yet, after the groups otherwise, the list is topped up with ghost
+  // cards that fade out. Decorative only, so aria-hidden.
+  const GROUP_GHOST_TARGET = 4;
+  function renderGroupGhosts(parent, shown) {
+    const ghosts = Math.max(0, GROUP_GHOST_TARGET - shown);
+    for (let j = 0; j < ghosts; j++) {
+      const ghost = el("div", "gh-ghost");
+      ghost.setAttribute("aria-hidden", "true");
+      ghost.style.opacity = String(+(0.75 * (1 - j / ghosts)).toFixed(2));
+      ghost.innerHTML = '<span class="gh-ghost-av"></span><span class="gh-ghost-line"></span>';
+      ghost.lastChild.style.width = [55, 40, 48][j % 3] + "%";
+      parent.appendChild(ghost);
+    }
+  }
+
   function renderGroupsSection(parent, groups, enterStagger) {
     const section = el("section", "games-section");
     const heading = el("div", "games-groups-heading");
@@ -7340,21 +7359,15 @@
     // that summoned it.
     renderCreateGroupPanel(section);
     if (!groups.length) {
-      // No group yet: a dashed card to create the first one, and two faded ghost rows that hint
-      // at the list it will start (2026-10-08 owner pick).
+      // No group yet: a dashed card to create the first one, then ghost cards that hint at the
+      // list it will start (2026-10-08 owner pick) -- four cards in all.
       const cta = el("button", "gh-cta");
       cta.type = "button";
       cta.setAttribute("aria-expanded", String(createGroupOpen));
       cta.innerHTML = '<span class="gh-cta-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"></path></svg></span><span>צור את הקבוצה הראשונה</span>';
       cta.addEventListener("click", toggleCreateGroupPanel);
       section.appendChild(cta);
-      [.3, .15].forEach(opacity => {
-        const ghost = el("div", "gh-ghost");
-        ghost.setAttribute("aria-hidden", "true");
-        ghost.style.opacity = String(opacity);
-        ghost.innerHTML = '<span class="gh-ghost-av"></span><span class="gh-ghost-line"></span>';
-        section.appendChild(ghost);
-      });
+      renderGroupGhosts(section, 1);
     } else {
       const list = el("div", "games-group-list");
       groups.forEach((group, idx) => {
@@ -7366,6 +7379,7 @@
           onToggle: () => toggleGroupCard(groupId),
         }));
       });
+      renderGroupGhosts(list, groups.length);
       section.appendChild(list);
     }
     parent.appendChild(section);

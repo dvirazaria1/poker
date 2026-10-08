@@ -218,9 +218,10 @@ test('every dealer hand has five cards with a known suit, and the spread reads t
   assert.match(mod, /const paintAll = h => cards\.forEach\(c => ghPaint\(c, GH_HANDS\[h\]\[1\]\[posOf\(c\)\]\)\);/);
 });
 
-test('with no group, the groups section is a dashed "צור את הקבוצה הראשונה" card and two ghost rows', () => {
+test('with no group, the groups section is a dashed "צור את הקבוצה הראשונה" card topped up with ghost cards', () => {
   const src = sourceBetween('  function renderGroupsSection(', '  // 2026-10-08 (owner ask): tapping a group card');
   assert.match(src, /if \(groups\.length\) heading\.appendChild\(createGroupBtn\);/);
   assert.match(src, /cta\.addEventListener\("click", toggleCreateGroupPanel\);/);
-  assert.match(src, /\[\.3, \.15\]\.forEach/);
+  // 2026-10-08: the first-group card plus ghosts make four cards (see tests/group-ghosts.test.cjs)
+  assert.match(src, /renderGroupGhosts\(section, 1\);/);
 });
