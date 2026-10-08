@@ -51,12 +51,16 @@ test('reduced motion shows a still table -- the Web Animations ignore the global
 
 test('one instance per surface survives re-renders; leaving gathers, folds and removes it', () => {
   assert.match(game, /const connectingSlots = new Map\(\);/);
-  assert.match(game, /parent\.appendChild\(slot\.node\);\n    slot\.shownAt = performance\.now\(\);\n    if \(!slot\.running\) runConnectingSlot\(slot\);/);
+  assert.match(game, /parent\.appendChild\(slot\.node\);\n    slot\.seenAt = performance\.now\(\);\n    if \(!slot\.running\) runConnectingSlot\(slot\);/);
   assert.match(game, /if \(!slot\.leaving\) leaveConnectingSlot\(key, slot\);/);
   const leave = sourceBetween('  async function leaveConnectingSlot(key, slot) {', '  function renderConnectingSlot(');
+  assert.match(leave, /await Promise\.resolve\(\);\n    if \(!dealStill\(\) && slot\.node\.isConnected\)/);
   assert.match(leave, /await dealGather\(/);
   assert.match(leave, /height: "0px"/);
+  assert.match(leave, /await Promise\.race\(\[fold, dealWait\(1200\)\]\);/);
   assert.match(leave, /slot\.node\.remove\(\);/);
+  assert.match(leave, /clearInterval\(slot\.beat\);/);
+  assert.match(game, /slot\.beat = setInterval\(\(\) => \{ if \(slot\.node\.getClientRects\(\)\.length\) slot\.seenAt = performance\.now\(\); \}, 250\);/);
 });
 
 test('every surface: connecting shows the game, signed out shows the account note', () => {

@@ -960,7 +960,7 @@
   .connecting.full { margin-top: 18px; }
   .connecting.mini { flex-direction: row; justify-content: center; gap: 10px; margin: 6px 0 4px; min-height: 30px; }
   .connecting-stage { position: relative; flex: 0 0 auto; }
-  .connecting.full .connecting-stage { width: 236px; height: 112px; }
+  .connecting.full .connecting-stage { width: 236px; height: 118px; }
   .connecting.mini .connecting-stage { width: 34px; height: 24px; }
   .connecting-cap { margin-top: 6px; min-height: 18px; color: var(--dim); font-size: 12px; font-weight: 300; }
   .connecting.mini .connecting-cap { margin-top: 0; }
@@ -1709,7 +1709,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 125</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 126</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -12109,7 +12109,7 @@
   // every render and the Web Animations keep running, so a render never restarts the hand. Once the
   // gate leaves "connecting" the cards gather, the slot folds and removes itself; the real controls
   // are live already. Spec: docs/superpowers/specs/2026-10-08-connecting-game-design.md
-  const connectingSlots = new Map(); // key -> { node, kind, stage, cap, cards, running, leaving, shownAt }
+  const connectingSlots = new Map(); // key -> { node, kind, stage, cap, cards, running, leaving, seenAt, beat }
   const DEAL_SUITS = [["♠︎", false], ["♥︎", true], ["♣︎", false], ["♦︎", true]];
   const DEAL_DECK = [0, 42];
   const DEAL_SEATS = [[-86, -26], [-30, -36], [30, -36], [86, -26]];
@@ -12265,11 +12265,14 @@
     const cap = el("span", "connecting-cap", "רגע, מתחברים");
     cap.setAttribute("aria-hidden", "true");
     node.append(stage, cap);
-    const slot = { node, kind, stage, cap, cards: {}, running: false, leaving: false, shownAt: 0 };
+    const slot = { node, kind, stage, cap, cards: {}, running: false, leaving: false, seenAt: 0, beat: 0 };
+    // When was it last actually on screen? A render detaches the node before re-appending it, so
+    // only a heartbeat can tell a visible slot from one whose screen was left while connecting.
+    slot.beat = setInterval(() => { if (slot.node.getClientRects().length) slot.seenAt = performance.now(); }, 250);
     if (kind === "full") {
       DEAL_SEATS.forEach(s => {
         const seat = el("span", "deal-seat");
-        seat.style.transform = "translate(" + s[0] + "px," + (s[1] - 20) + "px)";
+        seat.style.transform = "translate(" + s[0] + "px," + (s[1] - 17) + "px)";
         stage.appendChild(seat);
       });
       slot.cards.base = [dealCard(stage), dealCard(stage)];
@@ -12288,25 +12291,33 @@
   }
   async function leaveConnectingSlot(key, slot) {
     slot.leaving = true;
+    clearInterval(slot.beat);
+    // Surfaces build their section off-document and attach it at the end of the (synchronous)
+    // render: let that finish so the fold has a node on the page to animate.
+    await Promise.resolve();
     if (!dealStill() && slot.node.isConnected) {
       const deck = slot.kind === "full" ? DEAL_DECK : [0, 0];
-      await dealGather(Object.values(slot.cards).flat(), deck);
-      const cs = getComputedStyle(slot.node);
-      await dealMove(slot.node, [
-        { height: slot.node.offsetHeight + "px", marginTop: cs.marginTop, marginBottom: cs.marginBottom, opacity: 1 },
-        { height: "0px", marginTop: "0px", marginBottom: "0px", opacity: 0 },
-      ], { d: 260, e: "ease-in-out" });
+      const fold = (async () => {
+        await dealGather(Object.values(slot.cards).flat(), deck);
+        const cs = getComputedStyle(slot.node);
+        await dealMove(slot.node, [
+          { height: slot.node.offsetHeight + "px", marginTop: cs.marginTop, marginBottom: cs.marginBottom, opacity: 1 },
+          { height: "0px", marginTop: "0px", marginBottom: "0px", opacity: 0 },
+        ], { d: 260, e: "ease-in-out" });
+      })();
+      // A hidden page freezes the animation timeline: never let the slot outlive its state for that.
+      await Promise.race([fold, dealWait(1200)]);
     }
     slot.node.remove();
     if (connectingSlots.get(key) === slot) connectingSlots.delete(key);
   }
-  // Called by each surface on every render. A slot last shown more than 1.5s ago is stale (its
+  // Called by each surface on every render. A slot not on screen for over a second is stale (its
   // screen was left while connecting): it goes without a fold.
   function renderConnectingSlot(parent, key, kind, gate) {
     let slot = connectingSlots.get(key);
     if (gate !== "connecting") {
       if (!slot) return;
-      if (!slot.leaving && performance.now() - slot.shownAt > 1500) { connectingSlots.delete(key); slot.node.remove(); return; }
+      if (!slot.leaving && performance.now() - slot.seenAt > 1000) { clearInterval(slot.beat); connectingSlots.delete(key); slot.node.remove(); return; }
       parent.appendChild(slot.node);
       if (!slot.leaving) leaveConnectingSlot(key, slot);
       return;
@@ -12317,7 +12328,7 @@
       connectingSlots.set(key, slot);
     }
     parent.appendChild(slot.node);
-    slot.shownAt = performance.now();
+    slot.seenAt = performance.now();
     if (!slot.running) runConnectingSlot(slot);
   }
 
