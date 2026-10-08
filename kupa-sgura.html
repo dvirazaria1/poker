@@ -1748,7 +1748,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 132</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 133</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -1791,7 +1791,7 @@
   <div class="login" id="login" hidden>
   <div class="login-in">
     <h2>כניסה</h2>
-    <p class="login-benefit">חשבון שומר את החובות והקבוצות שלך בין ערבים ובין מכשירים. בלי סיסמה.</p>
+    <p class="login-benefit">חשבון שומר את החובות והקבוצות שלך בין משחקים ובין מכשירים. בלי סיסמה.</p>
     <p class="join-notice-status" id="loginNote" hidden></p>
     <div class="auth-block" id="authBlock" hidden>
       <button type="button" class="btn-google" id="authGoogleBtn">
@@ -1900,7 +1900,7 @@
       <svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
     </div>
     <h2 class="push-prompt-title" id="pushPromptTitle">לקבל התראות?</h2>
-    <p class="push-prompt-text">נודיע לך כשנפתח משחק בקבוצה שלך, כשנשאר חוב בסוף ערב, וכשמישהו שולח לך בקשת חברות.</p>
+    <p class="push-prompt-text">נודיע לך כשנפתח משחק בקבוצה שלך, כשנשאר חוב בסוף משחק, וכשמישהו שולח לך בקשת חברות.</p>
     <button type="button" class="btn-primary" id="pushPromptAllow">אשר התראות</button>
     <button type="button" class="push-prompt-later" id="pushPromptLater">לא עכשיו</button>
     <p class="push-prompt-error" id="pushPromptError" hidden></p>
@@ -7931,7 +7931,7 @@
     const groupSummaries = getGroupSummaries(collectionsOf(state), me, cloudGroupAggregates);
     // Nothing to list yet: an onboarding heading over the dealer instead of "השולחנות שלך".
     const empty = !activeSummaries.length && !groupSummaries.length;
-    inner.appendChild(el("h2", "games-home-title", empty ? "אול־אין על הערב הבא" : "השולחנות שלך"));
+    inner.appendChild(el("h2", "games-home-title", empty ? "אול־אין על המשחק הבא" : "השולחנות שלך"));
     inner.appendChild(el("p", "games-home-lead", empty ? "צור קבוצה, צרף את החבר'ה, ואנחנו נדאג לכל השאר." : "המשחקים הפעילים והקבוצות שלך במקום אחד."));
     if (empty) renderGamesEmptyHero(inner); else ghStop();
     renderActiveGamesSection(inner, activeSummaries, enterStagger);
@@ -11022,10 +11022,10 @@
     // in the list below them; counts stay neutral (no tone).
     const tone = (n) => n > 0.005 ? " pos" : n < -0.005 ? " neg" : " zero";
     [
-      ["ערבים ששוחקו", String(games.length), ""],
-      ["ערבים ברווח", String(wins), ""],
-      ["הערב הטוב ביותר", fmtSigned(best), tone(best)],
-      ["הערב הגרוע ביותר", fmtSigned(worst), tone(worst)],
+      ["סה״כ משחקים", String(games.length), ""],
+      ["משחקים ברווח", String(wins), ""],
+      ["המשחק הטוב ביותר", fmtSigned(best), tone(best)],
+      ["המשחק הגרוע ביותר", fmtSigned(worst), tone(worst)],
     ].forEach(([lab, val, cls]) => {
       const cell = el("div", "pcell");
       cell.appendChild(el("span", "plab", lab));
@@ -11039,9 +11039,9 @@
     const histSec = el("section", "psection");
     histSec.style.animationDelay = ".12s";
     histSec.hidden = profileTab !== "balance";
-    histSec.appendChild(el("h2", "ptitle", "ערבים אחרונים"));
+    histSec.appendChild(el("h2", "ptitle", "משחקים אחרונים"));
     if (games.length === 0) {
-      histSec.appendChild(el("p", "empty-note", "עוד אין ערבים ברקורד. אחרי סגירת שולחן הערב יופיע כאן."));
+      histSec.appendChild(el("p", "empty-note", "עוד אין משחקים ברקורד. אחרי סגירת שולחן המשחק יופיע כאן."));
     } else {
       games.slice(0, 12).forEach((g, i) => {
         const row = el("div", "hgame");

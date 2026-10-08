@@ -164,7 +164,7 @@ test('getGroupSummary sets isMember=false for a user who left the group (findMyM
 // ---------- #5: profile empty-state copy no longer points at the removed "חישוב" tab ----------
 
 test('the recent-nights empty state describes the current navigation, not the removed "חישוב" tab', () => {
-  assert.match(html, /עוד אין ערבים ברקורד\. אחרי סגירת שולחן הערב יופיע כאן\./);
+  assert.match(html, /עוד אין משחקים ברקורד\. אחרי סגירת שולחן המשחק יופיע כאן\./);
   assert.doesNotMatch(html, /בטאב\s*[""]חישוב[""]/);
 });
 
