@@ -1004,22 +1004,38 @@
   .friend-action:active, .friends-invite-link:active, .friends-icon-btn:active, .friends-search-link:active { transform: scale(.96); }
   .friends-invite-link:disabled:active, .friends-icon-btn:disabled:active, .friends-search-link:disabled:active { transform: none; }
   .friend-error { color: var(--bad); font-size: 13px; font-weight: 500; margin: 0; text-align: center; animation: rise .25s ease both; }
-  /* Empty state: three dashed rings stand in for the friends to come -- the row's own ring, not a
-     new illustration (decorative, aria-hidden) -- then the page's one primary action. */
+  /* Friends, empty (owner pick "ג", 2026-10-08): the empty Games screen's shape -- heading, two
+     lines, a small scene, "החברים שלי" with a dashed invite card over ghost cards. The scene's
+     cards match the Games hero (same tokens and back), but every name is fr-*. */
   .friends-empty { display: flex; flex-direction: column; align-items: center; text-align: center; }
-  .friends-rings { display: flex; justify-content: center; margin: 10px 0 18px; }
-  .friends-rings span {
-    width: 44px; height: 44px; border-radius: 50%; box-sizing: border-box;
-    border: 1px dashed var(--faint); background: var(--bg);
-    display: inline-flex; align-items: center; justify-content: center;
+  .fr-hero { margin: 12px 0 2px; display: flex; flex-direction: column; align-items: center; }
+  .fr-stage { position: relative; width: 230px; height: 120px; pointer-events: none; }
+  .fr-card { position: absolute; width: 38px; height: 54px; border-radius: 4px; box-sizing: border-box; overflow: hidden; direction: ltr; }
+  .fr-card.face { background: var(--card-face); color: #0C1519; box-shadow: 0 0 0 1px rgba(12,21,25,.10), 0 2px 6px -2px rgba(12,21,25,.18); }
+  .fr-card.face.red { color: var(--card-red); }
+  .fr-ix { position: absolute; top: 4px; left: 4px; width: 12px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .fr-ix b { font: 800 14px/1 Heebo, sans-serif; letter-spacing: -.03em; }
+  .fr-ix b.ten { letter-spacing: -.12em; margin-left: -2px; }
+  .fr-ix svg { display: block; width: 9px; height: 9px; fill: currentColor; }
+  .fr-card.back { opacity: 0; background: #067D78; box-shadow: inset 0 0 0 2px #fff, 0 0 0 1px rgba(12,21,25,.12), 0 2px 6px -2px rgba(12,21,25,.2); }
+  .fr-card.back::before { content: ""; position: absolute; inset: 4px; border: 1px solid rgba(255,255,255,.4); border-radius: 2px; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.14) 0 1px, transparent 1px 5px), repeating-linear-gradient(-45deg, rgba(255,255,255,.14) 0 1px, transparent 1px 5px); }
+  .fr-seat { position: absolute; width: 26px; height: 26px; border-radius: 50%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; }
+  .fr-seat.mine { border: 1px solid var(--accent); color: var(--accent); background: var(--avatar-tint); }
+  .fr-seat.open { border: 1px dashed var(--faint); color: var(--faint); transition: border-color .3s, color .3s; }
+  .fr-seat.open.lit { border-color: var(--accent); color: var(--accent); }
+  .fr-tag { display: inline-block; height: 22px; padding: 0 10px; border-radius: 999px; font: 600 12px/22px Heebo, sans-serif; color: var(--accent-fill); background: color-mix(in srgb, var(--accent) 10%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); }
+  .friends-empty .friends-label { align-self: stretch; margin: 18px 0 8px; text-align: start; }
+  .friends-empty .friends-list { align-self: stretch; }
+  .fr-cta {
+    width: 100%; min-height: 52px; padding: 8px 12px; display: flex; align-items: center; gap: 12px; box-sizing: border-box;
+    border: 1.5px dashed var(--accent); border-radius: 16px; color: var(--accent); font-size: 14px; font-weight: 700; text-align: start;
+    transition: background-color .2s, transform .12s ease;
   }
-  .friends-rings span + span { margin-inline-start: -12px; }
-  .friends-rings .is-add { border-color: var(--accent); color: var(--accent); }
-  .friends-rings.is-off .is-add { border-color: var(--faint); color: var(--faint); }
-  .friends-rings svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
-  .friends-empty .friends-lead { max-width: 270px; }
-  .friends-empty .btn-primary { align-self: center; margin-top: 22px; }
-  .friends-empty .btn-primary:disabled { opacity: 1; }
+  .fr-cta-ic { width: 34px; height: 34px; flex: 0 0 auto; box-sizing: border-box; border-radius: 50%; border: 1.5px dashed currentColor; display: flex; align-items: center; justify-content: center; }
+  .fr-cta-ic svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+  .fr-cta:active { transform: scale(.98); }
+  .fr-cta:disabled { border-color: var(--faint); color: var(--faint); cursor: default; }
+  .fr-cta:disabled:active { transform: none; }
   /* The search panel reuses .games-create-panel (same 0fr -> 1fr), lighter here: no heading,
      an underline field, then "שלח בקשה" beside "ביטול". */
   .friends-sec .games-create-panel { margin-top: 0; align-self: stretch; }
@@ -1033,8 +1049,6 @@
      The cards move by Web Animations; reduced motion gets a still table from the JS. */
   .connecting { display: flex; flex-direction: column; align-items: center; overflow: hidden; }
   .connecting.full { margin-top: 18px; }
-  /* Owner, 2026-10-08: on the friends screen the hand sits 25px lower, clear of the search link. */
-  .friends-empty .connecting.full { margin-top: 43px; }
   .connecting.mini { flex-direction: row; justify-content: center; gap: 10px; margin: 6px 0 4px; min-height: 30px; }
   .connecting-stage { position: relative; flex: 0 0 auto; }
   .connecting.full .connecting-stage { width: 236px; height: 104px; }
@@ -1789,7 +1803,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 143</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 144</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -10817,8 +10831,8 @@
   // A short list is topped up to five with ghost cards that fade out (owner, 2026-10-08): the screen
   // never looks bare, and it hints there is room for more. Decorative only, so aria-hidden.
   const FRIEND_GHOST_TARGET = 5;
-  function renderFriendGhosts(parent, shown, enter) {
-    const ghosts = FRIEND_GHOST_TARGET - shown;
+  function renderFriendGhosts(parent, shown, enter, target = FRIEND_GHOST_TARGET) {
+    const ghosts = Math.max(0, target - shown);
     for (let j = 0; j < ghosts; j++) {
       const ghost = el("div", "friend-ghost" + (enter ? " anim" : ""));
       ghost.setAttribute("aria-hidden", "true");
@@ -10891,7 +10905,7 @@
     if (friendInviteSharing) return "יוצר קישור…";
     const cached = !!(friendInviteLinkCache && authUser && friendInviteLinkCache.userId === authUser.id);
     if (short) return cached ? "+ שתף קישור" : "+ הזמן";
-    return cached ? "שתף את קישור ההזמנה" : "הזמן חבר בקישור";
+    return cached ? "שתף את קישור ההזמנה" : "הזמן את החבר הראשון";
   }
   // Primary path: share my personal link -- no lookup, no typed name. The link comes from a
   // server RPC, so without a signed-in session the button stays, faint and disabled.
@@ -10917,22 +10931,123 @@
     if (online) btn.addEventListener("click", toggleAddFriendPanel);
     return btn;
   }
-  // No friends and no requests: three dashed rings (decorative), a headline, the benefit line,
-  // then the page's one primary action and the quieter search link beneath it.
+  // ---------- Friends, empty: an open seat across the table (owner pick "ג", 2026-10-08) ----------
+  // The scene above the invite: your two cards face up by your seat, and across the table an
+  // empty seat that keeps being dealt two face-down cards, waiting for a friend. One persistent
+  // instance (frHero), so a re-render never restarts it; it stops by itself once its node leaves
+  // the page or is hidden, and the next render starts it again. Paced by the clock (a hidden page
+  // freezes animations, not timers). Card faces match the Games hero -- the same suit paths, kept
+  // here as their own copy so neither screen depends on the other's code.
+  const FR_SUITS = {
+    s: '<path d="M12 1.8c-1.9 3-9.2 7.6-9.2 12.1 0 2.7 2.1 4.6 4.6 4.6 1.5 0 2.8-.6 3.6-1.7-.3 2.1-1.1 3.7-2.6 5.3h7.2c-1.5-1.6-2.3-3.2-2.6-5.3.8 1.1 2.1 1.7 3.6 1.7 2.5 0 4.6-1.9 4.6-4.6 0-4.5-7.3-9.1-9.2-12.1z"/>',
+    h: '<path d="M12 21.6S2.4 15.8 2.4 8.9C2.4 5.6 4.8 3 7.9 3c1.8 0 3.2.9 4.1 2.4C12.9 3.9 14.3 3 16.1 3c3.1 0 5.5 2.6 5.5 5.9 0 6.9-9.6 12.7-9.6 12.7z"/>',
+    d: '<path d="M12 1.6c.5 0 .9.2 1.2.6l7.4 8.6c.6.7.6 1.7 0 2.4l-7.4 8.6c-.6.8-1.8.8-2.4 0l-7.4-8.6c-.6-.7-.6-1.7 0-2.4l7.4-8.6c.3-.4.7-.6 1.2-.6z"/>',
+    c: '<circle cx="12" cy="6.6" r="4.6"/><circle cx="6.3" cy="13.6" r="4.6"/><circle cx="17.7" cy="13.6" r="4.6"/><path d="M10.5 12.5h3c.1 3.4.9 5.8 2.8 8.3H7.7c1.9-2.5 2.7-4.9 2.8-8.3z"/>',
+  };
+  const FR_HANDS = [["A", "s", "K", "s"], ["K", "c", "K", "d"], ["Q", "h", "Q", "s"], ["A", "d", "Q", "d"], ["J", "c", "10", "c"]];
+  let frHero = null;
+  function frPaint(card, rank, suit) {
+    card.className = "fr-card face" + (suit === "h" || suit === "d" ? " red" : "");
+    card.innerHTML = '<span class="fr-ix"><b' + (rank === "10" ? ' class="ten"' : "") + ">" + rank + "</b>" +
+      '<svg viewBox="0 0 24 24" aria-hidden="true">' + FR_SUITS[suit] + "</svg></span>";
+  }
+  function frAlive(hero) { return hero.wrap.isConnected && hero.wrap.getClientRects().length > 0; }
+  function frMove(card, frames, duration, easing, delay) {
+    card.animate(frames, { duration, easing: easing || "cubic-bezier(.2,.8,.2,1)", delay: delay || 0, fill: "forwards" });
+  }
+  async function frLoop(hero) {
+    const [mineA, mineB, backA, backB] = hero.cards;
+    let hand = 0;
+    for (;;) {
+      if (!frAlive(hero)) { hero.running = false; return; }
+      // a fresh hand for you: both cards turn over together
+      hand = (hand + 1) % FR_HANDS.length;
+      const h = FR_HANDS[hand];
+      [mineA, mineB].forEach(card => frMove(card, [{ transform: card.dataset.pose + " rotateY(0deg)" }, { transform: card.dataset.pose + " rotateY(90deg)" }], 150, "ease-in"));
+      await dealWait(160);
+      frPaint(mineA, h[0], h[1]);
+      frPaint(mineB, h[2], h[3]);
+      [mineA, mineB].forEach(card => frMove(card, [{ transform: card.dataset.pose + " rotateY(-90deg)" }, { transform: card.dataset.pose + " rotateY(0deg)" }], 170, "ease-out"));
+      await dealWait(420);
+      // two face-down cards slide across to the open seat
+      [backA, backB].forEach((card, k) => frMove(card, [
+        { transform: "translateX(110px) rotate(0deg)", opacity: 0 },
+        { transform: card.dataset.pose, opacity: 1 },
+      ], 520, "cubic-bezier(.16,.84,.3,1)", k * 180));
+      await dealWait(720);
+      hero.seat.classList.add("lit");
+      await dealWait(2000);
+      if (!frAlive(hero)) { hero.running = false; return; }
+      [backA, backB].forEach(card => frMove(card, [{ transform: card.dataset.pose, opacity: 1 }, { transform: card.dataset.pose, opacity: 0 }], 350));
+      hero.seat.classList.remove("lit");
+      await dealWait(900);
+    }
+  }
+  function renderFriendsEmptyHero(parent) {
+    if (!frHero) {
+      const wrap = el("div", "fr-hero");
+      const stage = el("div", "fr-stage");
+      stage.setAttribute("aria-hidden", "true");
+      const place = (cls, left, top, pose) => {
+        const node = el("span", cls);
+        node.style.left = left + "px";
+        node.style.top = top + "px";
+        node.dataset.pose = pose;
+        node.style.transform = pose;
+        stage.appendChild(node);
+        return node;
+      };
+      const mineA = place("fr-card face", 150, 30, "rotate(-6deg)");
+      const mineB = place("fr-card face", 178, 28, "rotate(6deg)");
+      const backA = place("fr-card back", 22, 30, "rotate(-6deg)");
+      const backB = place("fr-card back", 50, 28, "rotate(6deg)");
+      const mySeat = place("fr-seat mine", 170, 92, "");
+      const seat = place("fr-seat open", 42, 92, "");
+      seat.textContent = "?";
+      frPaint(mineA, FR_HANDS[0][0], FR_HANDS[0][1]);
+      frPaint(mineB, FR_HANDS[0][2], FR_HANDS[0][3]);
+      wrap.append(stage, el("span", "fr-tag", "מקום פנוי"));
+      frHero = { wrap, stage, seat, mySeat, cards: [mineA, mineB, backA, backB], running: false };
+    }
+    frHero.mySeat.textContent = String(me || "").trim().charAt(0) || "?";
+    parent.appendChild(frHero.wrap);
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      frHero.cards.slice(2).forEach(card => { card.style.opacity = "1"; }); // a still table: the seat is dealt
+      return;
+    }
+    if (!frHero.running) {
+      frHero.running = true;
+      const hero = frHero;
+      setTimeout(() => frLoop(hero).catch(() => { hero.running = false; }), 0); // after the render attaches it
+    }
+  }
+
+  // No friends and no requests: the same shape as the empty Games screen -- a heading, two lines,
+  // the open-seat scene, then "החברים שלי" with a dashed invite card topped up with ghost cards to
+  // four, and the quieter search link beneath (owner pick, 2026-10-08).
   function renderFriendsEmpty(sec, gate) {
     const online = gate === "online";
     const wrap = el("div", "friends-empty");
-    const rings = el("div", "friends-rings" + (online ? "" : " is-off"));
-    rings.setAttribute("aria-hidden", "true");
-    rings.innerHTML = '<span></span><span></span><span class="is-add"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"></path></svg></span>';
-    wrap.appendChild(rings);
-    wrap.appendChild(el("h2", "friends-title", "עוד אין חברים"));
-    wrap.appendChild(el("p", "friends-lead", "חברים שמצטרפים דרך קישור זמינים מיד לבחירה בכל משחק וקבוצה."));
-    if (me) wrap.appendChild(makeFriendInviteBtn("btn-primary friends-share-btn", false, online));
+    wrap.appendChild(el("h2", "friends-title", "אין פוקר בלי חבר'ה"));
+    const lead = el("p", "friends-lead");
+    lead.append("שלחו קישור לחבר'ה.", el("br"), "הם יופיעו כאן, מוכנים לכל משחק.");
+    wrap.appendChild(lead);
+    renderFriendsEmptyHero(wrap);
+    wrap.appendChild(el("h3", "friends-label", "החברים שלי"));
+    const list = el("div", "friends-list");
+    if (me) {
+      const cta = makeFriendInviteBtn("fr-cta", false, online);
+      const label = cta.textContent;
+      cta.innerHTML = '<span class="fr-cta-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"></path></svg></span>';
+      cta.appendChild(el("span", "", label));
+      list.appendChild(cta);
+    }
+    renderFriendGhosts(list, me ? 1 : 0, false, 4);
+    wrap.appendChild(list);
     if (friendInviteShareError) wrap.appendChild(el("p", "friend-error", friendInviteShareError));
     wrap.appendChild(makeFriendSearchBtn("friends-search-link", online, "חיפוש לפי שם או מייל"));
     if (online) renderAddFriendPanel(wrap);
-    renderConnectingSlot(wrap, "friends", "full", gate);
+    renderConnectingSlot(wrap, "friends", "mini", gate);
     if (gate === "signedOut") wrap.appendChild(el("p", "friends-note", ACCOUNT_NOTE));
     sec.appendChild(wrap);
   }

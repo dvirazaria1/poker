@@ -69,7 +69,7 @@ test('one instance per surface survives re-renders; leaving gathers, folds and r
 });
 
 test('every surface: connecting shows the game, signed out shows the account note', () => {
-  assert.match(html, /renderConnectingSlot\(wrap, "friends", "full", gate\);\n    if \(gate === "signedOut"\) wrap\.appendChild\(el\("p", "friends-note", ACCOUNT_NOTE\)\);/);
+  assert.match(html, /renderConnectingSlot\(wrap, "friends", "mini", gate\);\n    if \(gate === "signedOut"\) wrap\.appendChild\(el\("p", "friends-note", ACCOUNT_NOTE\)\);/);
   assert.match(html, /renderConnectingSlot\(sec, "friends-list", "mini", gate\);\n    if \(gate === "signedOut"\) sec\.appendChild\(el\("p", "friends-note", ACCOUNT_NOTE\)\);/);
   assert.match(html, /renderConnectingSlot\(content, "group-add", "mini", gate\);\n    if \(gate === "signedOut"\) content\.appendChild\(el\("p", "games-member-add-note", ACCOUNT_NOTE\)\);/);
   assert.match(html, /if \(qr\) card\.appendChild\(qr\);\n    renderConnectingSlot\(card, "group-invite", "mini", gateNow\(\)\);/);
@@ -99,7 +99,7 @@ test('a five-card board dealt like a casino: the flop leaves the deck as one sta
   assert.doesNotMatch(html, /deal-seat/);
 });
 
-test('on the friends screen the hand sits 25px lower than elsewhere (owner, 2026-10-08)', () => {
+test('the friends screen shows the mini riffle while connecting -- its own open-seat scene already has cards', () => {
   assert.match(html, /\.connecting\.full \{ margin-top: 18px; \}/);
-  assert.match(html, /\.friends-empty \.connecting\.full \{ margin-top: 43px; \}/);
+  assert.doesNotMatch(html, /\.friends-empty \.connecting\.full/);
 });

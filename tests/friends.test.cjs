@@ -187,7 +187,7 @@ test('friends are a primary screen and are no longer rendered inside profile', (
   assert.doesNotMatch(profileSource, /friendRequestsFor\(/);
   // 2026-10-08 thin rings: the empty state states the fact; search and invite are disabled
   // without a session, and ACCOUNT_NOTE says what to do.
-  assert.match(html, /עוד אין חברים/);
+  assert.match(html, /אין פוקר בלי חבר'ה/);
   assert.match(html, /"חיפוש לפי שם או מייל"/);
   assert.match(html, /btn\.disabled = !online;/);
   assert.match(html, /btn\.setAttribute\("aria-disabled", online \? "false" : "true"\);/);
@@ -228,22 +228,41 @@ test('rows are a 34px avatar ring and a name; the stagger only plays on entering
   assert.match(html, /\.friend-row\.is-outgoing \.pavatar \{ border-style: dashed; \}/);
 });
 
-test('the empty state: decorative rings, a headline, the benefit line, one primary invite, then a quiet search link', () => {
+test('the empty state mirrors the empty Games screen: heading, two lines, the open-seat scene, a dashed invite over ghosts', () => {
   const empty = sourceBetween('  function renderFriendsEmpty(sec, gate)', '  function renderFriendsList(');
-  assert.match(empty, /rings\.setAttribute\("aria-hidden", "true"\);/);
-  assert.match(empty, /el\("h2", "friends-title", "עוד אין חברים"\)/);
-  assert.match(empty, /el\("p", "friends-lead", "חברים שמצטרפים דרך קישור זמינים מיד לבחירה בכל משחק וקבוצה\."\)/);
-  const invite = empty.indexOf('makeFriendInviteBtn("btn-primary friends-share-btn", false, online)');
-  const search = empty.indexOf('makeFriendSearchBtn("friends-search-link", online, "חיפוש לפי שם או מייל")');
-  assert.ok(invite >= 0 && search > invite, 'the primary invite comes first, the search link under it');
-  assert.equal((empty.match(/btn-primary/g) || []).length, 1, 'one primary action only');
+  assert.match(empty, /el\("h2", "friends-title", "אין פוקר בלי חבר'ה"\)/);
+  assert.match(empty, /lead\.append\("שלחו קישור לחבר'ה\.", el\("br"\), "הם יופיעו כאן, מוכנים לכל משחק\."\);/);
+  const steps = [
+    'renderFriendsEmptyHero(wrap);',
+    'el("h3", "friends-label", "החברים שלי")',
+    'makeFriendInviteBtn("fr-cta", false, online)',
+    'renderFriendGhosts(list, me ? 1 : 0, false, 4);',
+    'makeFriendSearchBtn("friends-search-link", online, "חיפוש לפי שם או מייל")',
+    'renderConnectingSlot(wrap, "friends", "mini", gate);',
+  ].map(s => empty.indexOf(s));
+  steps.forEach((idx, i) => assert.ok(idx >= 0, `missing step ${i}`));
+  for (let i = 1; i < steps.length; i++) assert.ok(steps[i] > steps[i - 1], `step ${i} out of order`);
+  assert.doesNotMatch(empty, /btn-primary|friends-rings/);
+});
+
+test('the open-seat scene: your hand face up, an empty seat dealt two face-down cards, one instance, a still frame for reduced motion', () => {
+  const hero = sourceBetween('  // ---------- Friends, empty: an open seat across the table', '  // No friends and no requests:');
+  assert.match(hero, /let frHero = null;/);
+  assert.match(hero, /stage\.setAttribute\("aria-hidden", "true"\);/);
+  assert.match(hero, /el\("span", "fr-tag", "מקום פנוי"\)/);
+  assert.match(hero, /matchMedia\("\(prefers-reduced-motion: reduce\)"\)\.matches/);
+  assert.match(hero, /if \(!frAlive\(hero\)\) \{ hero\.running = false; return; \}/);
+  assert.match(hero, /const FR_HANDS = \[/);
+  assert.match(html, /\.fr-card\.face \{[^}]*background: var\(--card-face\);/);
+  assert.match(html, /\.fr-seat\.open \{[^}]*border: 1px dashed var\(--faint\);/);
+  assert.match(html, /\.fr-cta \{[^}]*border: 1\.5px dashed var\(--accent\);/);
 });
 
 test('the invite action keeps its loading and cached-link labels in both places', () => {
   const label = sourceBetween('  function friendInviteLabel(short)', '  function makeFriendInviteBtn(');
   assert.match(label, /if \(friendInviteSharing\) return "יוצר קישור…";/);
   assert.match(label, /cached \? "\+ שתף קישור" : "\+ הזמן"/);
-  assert.match(label, /cached \? "שתף את קישור ההזמנה" : "הזמן חבר בקישור"/);
+  assert.match(label, /cached \? "שתף את קישור ההזמנה" : "הזמן את החבר הראשון"/);
 });
 
 test('with data: title, incoming requests, the heading with both add actions, then friends, then outgoing', () => {
@@ -273,9 +292,9 @@ test('every friend is its own card; a short list is topped up to five with fadin
   assert.match(html, /\.friend-row \{[^}]*border: 1px solid var\(--line\); border-radius: 16px;/);
   assert.match(html, /\.friend-row\.is-incoming \{ border-color: var\(--accent\); \}/);
   assert.match(html, /\.friend-ghost \{[^}]*border: 1px dashed var\(--faint\); border-radius: 16px;/);
-  const ghosts = sourceBetween('  function renderFriendGhosts(parent, shown, enter) {', '  // The inline add-friend panel');
+  const ghosts = sourceBetween('  function renderFriendGhosts(parent, shown, enter, target = FRIEND_GHOST_TARGET) {', '  // The inline add-friend panel');
   assert.match(html, /const FRIEND_GHOST_TARGET = 5;/);
-  assert.match(ghosts, /const ghosts = FRIEND_GHOST_TARGET - shown;/);
+  assert.match(ghosts, /const ghosts = Math\.max\(0, target - shown\);/);
   assert.match(ghosts, /ghost\.setAttribute\("aria-hidden", "true"\);/);
   assert.match(ghosts, /ghost\.style\.opacity = String\(\+\(0\.75 \* \(1 - j \/ ghosts\)\)\.toFixed\(2\)\);/);
 });
