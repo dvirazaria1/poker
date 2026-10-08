@@ -69,7 +69,8 @@ test('the open group card: a big table button, a "סטטיסטיקות" tile, th
   assert.match(main, /onTable = \(\) => \{ currentGroupId = groupId; toggleStartGamePanel\(\); \};/);
   assert.match(main, /el\("button", "games-group-table-btn"\)/);
   assert.match(main, /<span>סטטיסטיקות<\/span>/);
-  assert.match(main, /stats\.addEventListener\("click", \(\) => setGroupCardMode\("details", "games"\)\);/);
+  assert.match(main, /stats\.addEventListener\("click", \(\) => \{ groupCardMotion = "unfold"; setGroupCardMode\("details", "games"\); \}\);/);
+  assert.match(main, /row\.append\(stats, table\);/); // statistics on the start (right) side
   assert.match(main, /join\.addEventListener\("click", \(\) => shareGroupInvite\(group\)\);/);
   assert.doesNotMatch(main, /formatGamesPlayedCount/);
   assert.doesNotMatch(main, /"פירוט"/);
@@ -81,7 +82,8 @@ test('details mode swaps the tiles for back / games / ranking / stats; settings 
   const roles = sourceBetween('  function renderGroupCardRoles(view, groupId, viewerIsAdmin) {', '  function renderGroupSurface() {');
   assert.match(roles, /if \(!viewerIsAdmin \|\| lastAdmin\) \{\s*sw\.disabled = true;/);
   const details = sourceBetween('  function renderGroupCardDetails(content, group) {', '  function renderGroupCardTimeline(');
-  ['"חזרה"', '"משחקים"', '"דירוג"', '"נתונים"'].forEach(label => assert.ok(details.includes(label), label));
+  ['<span>חזור</span>', '"משחקים"', '"דירוג"', '"נתונים"'].forEach(label => assert.ok(details.includes(label), label));
+  assert.match(details, /if \(groupCardMotion === "unfold"\) \{ row\.classList\.add\("unfold"\); groupCardMotion = ""; \}/);
   const settings = sourceBetween('  function renderGroupCardSettings(content, group) {', '  function renderGroupCardDetailsForm(');
   ['"חזרה"', '"פרטים"', '"הזמנה"', '"ניהול"'].forEach(label => assert.ok(settings.includes(label), label));
   assert.match(settings, /tiles\.push\(\{ key: "roles"/);
