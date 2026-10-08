@@ -69,7 +69,7 @@ test('the open group card: a big table button, a "סטטיסטיקות" tile, th
   assert.match(main, /onTable = \(\) => \{ currentGroupId = groupId; toggleStartGamePanel\(\); \};/);
   assert.match(main, /el\("button", "games-group-table-btn"\)/);
   assert.match(main, /<span>סטטיסטיקות<\/span>/);
-  assert.match(main, /stats\.addEventListener\("click", \(\) => \{ groupCardMotion = "unfold"; setGroupCardMode\("details", "games"\); \}\);/);
+  assert.match(main, /stats\.addEventListener\("click", \(\) => \{ groupCardMotion = "unfold"; groupCardViewEnter = "slide"; setGroupCardMode\("details", "games"\); \}\);/);
   assert.match(main, /row\.append\(stats, table\);/); // statistics on the start (right) side
   assert.match(main, /join\.addEventListener\("click", \(\) => shareGroupInvite\(group\)\);/);
   assert.doesNotMatch(main, /formatGamesPlayedCount/);
@@ -147,4 +147,33 @@ test('active-game and group cards accept an anim/animDelay pair to drive the ent
   assert.match(activeCardSource, /actions\.animDelay/);
   assert.match(groupCardSource, /actions\.anim/);
   assert.match(groupCardSource, /actions\.animDelay/);
+});
+
+// ---------- open-card motion (2026-10-08): one movement, no hard cut, no replay ----------
+
+test('mode and tab changes go through swapGroupCardBody, which ghosts the old part and eases the height', () => {
+  const swap = sourceBetween('  function setGroupCardMode(mode, tab) {', '  // A row of square tiles;');
+  assert.match(swap, /swapGroupCardBody\(groupCardModeExits\(from, mode\)\);/);
+  assert.match(swap, /if \(from === "details" && to === "main"\) return \[\{ take: "row", motion: "ghost-fold" \}, \{ take: "rest", motion: "ghost-right" \}\];/);
+  assert.match(swap, /matchMedia\("\(prefers-reduced-motion: reduce\)"\)/);
+  assert.match(swap, /node\.classList\.remove\("unfold", "fold", "slide", "drop", "drop-in", "anim"\)/);
+  assert.match(swap, /body\.style\.transition = "height \.28s/);
+  // Closing no longer waits on a timer before re-rendering (that gap was the "double" animation).
+  const details = sourceBetween('  function renderGroupCardDetails(content, group) {', '  function renderGroupCardTimeline(');
+  assert.match(details, /back\.addEventListener\("click", \(\) => \{ groupCardMotion = "fold"; setGroupCardMode\("main"\); \}\);/);
+  assert.doesNotMatch(details, /setTimeout/);
+});
+
+test('a view animates in only right after a switch, never on a background re-render', () => {
+  const details = sourceBetween('  function renderGroupCardDetails(content, group) {', '  function renderGroupCardTimeline(');
+  assert.match(details, /el\("div", "games-group-view" \+ \(groupCardViewEnter === "slide" \? " slide" : ""\)\);\s*groupCardViewEnter = "";/);
+  const settings = sourceBetween('  function renderGroupCardSettings(content, group) {', '  function renderGroupCardDetailsForm(');
+  assert.match(settings, /groupCardViewEnter === "drop" \? " drop" : ""/);
+});
+
+test('every top-row tile of the open card is 54px tall, and the statistics tile keeps its width', () => {
+  assert.match(html, /\.games-group-action \{\s*min-width: 0; height: 54px;/);
+  assert.match(html, /\.games-group-table-btn \{\s*flex: 1 1 auto; min-width: 0; height: 54px;/);
+  assert.match(html, /\.games-group-stats-btn \{\s*flex: 0 0 96px; height: 54px;/);
+  assert.doesNotMatch(html, /\.games-group-tabs \.games-group-stats-btn \{ flex-basis/);
 });
