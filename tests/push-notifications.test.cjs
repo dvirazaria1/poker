@@ -50,7 +50,13 @@ test("the service worker shows pushes and focuses the app on tap; the function s
 test("the client asks permission only from the tap, and drops the subscription when the session ends (P4)", () => {
   const enable = html.slice(html.indexOf("  async function enablePushNotifications()"), html.indexOf("  async function disablePushNotifications()"));
   assert.match(enable, /await Notification\.requestPermission\(\)/);
-  assert.match(html, /document\.getElementById\("setPushBtn"\)\.addEventListener\("click", enablePushNotifications\);/);
+  // settings' switch turns notifications on or off; "on" calls straight into the enable path with
+  // no await first, so the permission prompt still runs inside the tap
+  assert.match(html, /document\.getElementById\("setPushBtn"\)\.addEventListener\("click", togglePushNotifications\);/);
+  const toggle = html.slice(html.indexOf("  async function togglePushNotifications()"), html.indexOf("  async function sendTestNotification()"));
+  assert.match(toggle, /if \(!pushIsOn\(\)\) \{ await enablePushNotifications\(\); return; \}/);
+  assert.match(toggle, /await disablePushNotifications\(\);/);
+  assert.ok(toggle.indexOf("await enablePushNotifications") < toggle.indexOf("await disablePushNotifications"), 'no await before the enable path');
   const exit = html.slice(html.indexOf("  function exitCloudMode() {"), html.indexOf("  function exitCloudMode() {") + 1600);
   assert.match(exit, /disablePushNotifications\(\);/);
   assert.match(html, /function enterCloudMode\(\) \{[\s\S]{0,200}reconcilePushOwnership\(\);/);

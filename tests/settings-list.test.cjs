@@ -6,11 +6,12 @@ const html = fs.readFileSync('kupa-sgura.html', 'utf8');
 const settings = html.slice(html.indexOf('<section class="settings-page" id="settings"'), html.indexOf('</section><!-- /#settings -->'));
 const refresh = html.slice(html.indexOf('function refreshSettings()'), html.indexOf('\n  }', html.indexOf('function refreshSettings()')));
 
-// The settings screen (2026-10-08): a list in titled groups -- identity, (sign-in), account
-// (ending in sign-out), display, notifications, info, danger zone -- with the version last.
+// The settings screen (2026-10-08): identity (picture, the underlined name with its pencil),
+// (sign-in), then titled groups -- account, notifications, info, danger zone -- then sign-out
+// and the version at the bottom. Dark mode lives only in the corner toggle.
 
-test('the groups appear in order, each with a quiet title', () => {
-  const order = ['class="set-identity"', 'id="setSignIn"', 'id="setAccountTitle"', 'id="setSwapBtn"', '>תצוגה<', 'id="setPush"', '>מידע<', 'id="setDangerTitle"', 'class="set-version"'];
+test('the groups appear in order, each with a quiet title, and sign-out sits at the bottom', () => {
+  const order = ['class="set-identity"', 'id="setSignIn"', 'id="setAccountTitle"', 'id="setPush"', '>מידע<', 'id="setDangerTitle"', 'id="setSwapBtn"', 'class="set-version"'];
   let last = -1;
   for (const marker of order) {
     const at = settings.indexOf(marker);
@@ -19,15 +20,37 @@ test('the groups appear in order, each with a quiet title', () => {
   }
   assert.match(settings, /<h3 class="set-section-title" id="setAccountTitle">חשבון<\/h3>/);
   assert.match(refresh, /setAccountTitle"\)\.textContent = authUser \? "חשבון" : "פרטים";/);
+  assert.match(settings, /<button type="button" class="btn-quiet set-signout-btn" id="setSwapBtn">התנתקות<\/button>\s*<p class="set-version">/);
 });
 
 test('every row is a label at the start and its value or control at the end, on a hairline', () => {
   assert.match(html, /\.set-row \{\n    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 54px;/);
   assert.match(html, /\.set-row-label \{ margin-inline-end: auto;/);
   assert.match(html, /\.set-group \{ border-top: 1px solid var\(--line\); \}/);
-  // the name row shows the name as its value, with the pencil as its control
-  assert.match(settings, /<span class="set-row-label">שם<\/span>\s*<span class="set-row-value" id="setNameValue"><\/span>\s*<button type="button" class="set-name-edit" id="setNameEdit"/);
-  assert.match(refresh, /setNameValue"\)\.textContent = me \|\| "אורח";/);
+});
+
+test('the big name is underlined with its pencil beside it, and the editor takes its place', () => {
+  const identity = settings.slice(settings.indexOf('class="set-identity"'), settings.indexOf('id="setSignIn"'));
+  assert.match(identity, /<div class="set-name-line" id="setNameLine">\s*<div class="set-name" id="setName"><\/div>\s*<button type="button" class="set-name-edit" id="setNameEdit" aria-label="עריכת השם">/);
+  assert.match(identity, /<div class="set-name-editor" id="setNameEditor" hidden>/);
+  assert.match(html, /\.set-name-line \.set-name \{ padding-bottom: 4px; border-bottom: 1px solid var\(--faint\);/);
+  assert.match(html, /\.set-name-line \{ display: grid; grid-template-columns: 44px auto 44px;/);
+  assert.match(refresh, /setNameLine"\)\.hidden = setNameEditing;/);
+  assert.doesNotMatch(settings, /id="setNameValue"/, 'no separate name row any more');
+});
+
+test('dark mode is only the corner toggle, not a settings row', () => {
+  assert.doesNotMatch(settings, /setThemeSwitch|מצב כהה|>תצוגה</);
+  assert.doesNotMatch(html, /getElementById\("setThemeSwitch"\)/);
+});
+
+test('notifications are a switch that turns on and off', () => {
+  assert.match(settings, /<span class="set-row-label" id="setPushLabel">התראות לטלפון<\/span>/);
+  assert.match(settings, /<button type="button" class="switch" id="setPushBtn" role="switch" aria-checked="false" aria-labelledby="setPushLabel"><\/button>/);
+  const row = html.slice(html.indexOf('  function refreshPushRow() {'), html.indexOf('  function refreshSettings() {'));
+  assert.match(row, /btn\.classList\.toggle\("on", on\);/);
+  assert.match(row, /btn\.setAttribute\("aria-checked", on \? "true" : "false"\);/);
+  assert.doesNotMatch(row, /btn\.textContent/);
 });
 
 test('a whole tappable row forwards the tap to its own control, never to a nested link or input', () => {
@@ -37,13 +60,7 @@ test('a whole tappable row forwards the tap to its own control, never to a neste
   assert.match(handler, /e\.target\.closest\("\.set-row-tap"\)/);
   assert.match(handler, /e\.target\.closest\("button, a, input"\)\) return;/);
   assert.match(handler, /row\.querySelector\("button:not\(\[hidden\]\)"\)/);
-  assert.equal((settings.match(/class="set-row set-row-tap/g) || []).length, 3, 'name, contact and dark-mode rows');
-});
-
-test('"מצב כהה" is on while the dark theme is', () => {
-  assert.match(settings, /<span class="set-row-label" id="setThemeLabel">מצב כהה<\/span>\s*<button type="button" class="switch" id="setThemeSwitch" role="switch" aria-labelledby="setThemeLabel"><\/button>/);
-  assert.match(refresh, /const isDark = document\.documentElement\.dataset\.theme !== "light";/);
-  assert.match(refresh, /sw\.classList\.toggle\("on", isDark\);/);
+  assert.equal((settings.match(/class="set-row set-row-tap/g) || []).length, 2, 'contact and notifications rows');
 });
 
 test('a local player sees where their data lives and one filled sign-in button', () => {
@@ -74,13 +91,22 @@ test('settings is a view of its own, reached from the gear, with the tab bar and
   assert.match(html, /\.corner-btn\.on \{ color: var\(--accent\); \}/);
 });
 
+test('the gear goes dark when settings closes: its hover tint is for devices that hover only', () => {
+  // on a phone a tapped button keeps :hover, which kept the gear turquoise after leaving settings
+  const style = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+  const hoverBlock = style.slice(style.indexOf('@media (hover: hover) {'));
+  assert.match(hoverBlock, /\.corner-btn:hover \{ color: var\(--accent\); \}/);
+  const outside = style.slice(0, style.indexOf('@media (hover: hover) {'));
+  assert.doesNotMatch(outside, /\.corner-btn:hover/);
+  assert.doesNotMatch(outside, /\n  \.set-name-edit:hover/);
+});
+
 test('the version line keeps the "גרסה N" shape build.py rewrites', () => {
   assert.match(settings, /<p class="set-version">גרסה \d+<\/p>/);
 });
 
 test('every new control animates, and the global reduced-motion rule is still last', () => {
   assert.match(html, /\.set-row-tap:active, \.set-row-btn:active, \.set-row-link:active \{ background-color: var\(--avatar-soft\); \}/);
-  assert.match(html, /\.set-row-action:active \{ transform: scale\(\.94\); \}/);
   assert.match(html, /#settings \.set-name-editor, #settings \.set-contact-editor \{[^}]*animation: rise \.28s ease both;/);
   const style = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
   assert.match(style, /@media \(prefers-reduced-motion: reduce\) \{\n    \* \{ animation: none !important; transition: none !important; \}\n  \}\n$/);
