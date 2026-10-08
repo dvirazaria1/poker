@@ -39,7 +39,7 @@ const CONTAINING_BLOCK_PROPS = /\btransform\s*:|(?<!backdrop-)\bfilter\s*:|backd
 
 test('the tab bar\'s own bottom offset folds in env(safe-area-inset-bottom), like .wrap\'s padding-bottom already does', () => {
   const body = ruleBody('  .tabbar {');
-  assert.match(body, /bottom:\s*calc\(10px \+ env\(safe-area-inset-bottom,\s*0px\)\)/,
+  assert.match(body, /bottom:\s*calc\(2px \+ env\(safe-area-inset-bottom,\s*0px\)\)/,
     '.tabbar must anchor off the same dynamic inset .wrap uses, not a bare px');
   // the sibling rule this idiom is mirrored from, so a future edit to one is caught if it drifts
   // from the other
