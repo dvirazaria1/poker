@@ -163,10 +163,10 @@
   :root[data-theme="light"] { --bar-bg: rgba(245,248,249,.9); }
   html { background: var(--bg); }
   .tabbar {
-    /* Fixed to the viewport, 10px above the home indicator. What keeps it from moving between
-       tabs is the body's min-height below, not anything here. */
+    /* Fixed to the viewport, 2px above the home indicator (owner, 2026-10-08: 8px lower than the
+       old 10px). What keeps it from moving between tabs is the body's min-height below. */
     position: fixed;
-    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(2px + env(safe-area-inset-bottom, 0px));
     inset-inline: 17px; margin-inline: auto;
     max-width: 470px; z-index: 20;
     background: var(--bar-bg);
@@ -1626,7 +1626,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 120</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 121</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
