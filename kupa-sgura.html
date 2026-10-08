@@ -550,8 +550,7 @@
   }
   .games-group-stats-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .games-group-players .games-group-join { width: 100%; color: var(--accent); font-weight: 600; text-align: start; border-bottom: 1px solid var(--line); }
-  .games-group-join-icon { width: 28px; height: 28px; flex: 0 0 auto; border-radius: 50%; border: 1.5px dashed var(--accent); display: flex; align-items: center; justify-content: center; }
-  .games-group-join-icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+  .games-group-join-plus { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
   .games-group-player-meta { color: var(--dim); font-size: 12px; font-weight: 300; }
   .games-group-action.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
   .games-group-gear { width: 34px; height: 34px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; color: var(--dim); border-radius: 50%; transition: color .2s; }
@@ -560,21 +559,25 @@
   .games-group-view { margin-top: 12px; }
   .games-group-view.centered { text-align: center; }
   .games-group-view-title { display: block; margin: 0 0 6px; color: var(--dim); font-size: 12px; font-weight: 400; }
-  .games-group-timeline { border-inline-start: 2px solid var(--line); padding-inline-start: 12px; }
-  .games-group-timeline-item { position: relative; padding: 0 0 10px; font-size: 13px; }
+  /* The rail is drawn per item (::after) so it runs dot to dot and stops at the last one; the
+     dots sit centred on it, inside the card's clipped body. */
+  .games-group-timeline { padding-inline-start: 4px; }
+  .games-group-timeline-item { position: relative; padding: 0 0 14px; padding-inline-start: 22px; font-size: 14px; line-height: 1.35; }
   .games-group-timeline-item:last-child { padding-bottom: 0; }
-  .games-group-timeline-item::before { content: ""; position: absolute; inset-inline-start: -17px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
-  .games-group-timeline-item.latest::before { background: var(--accent); }
+  .games-group-timeline-item::before { content: ""; position: absolute; inset-inline-start: 0; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 2px solid var(--faint); box-sizing: border-box; z-index: 1; }
+  .games-group-timeline-item.latest::before { background: var(--accent); border-color: var(--accent); }
+  .games-group-timeline-item::after { content: ""; position: absolute; inset-inline-start: 4px; top: 15px; bottom: -5px; width: 2px; background: var(--line); }
+  .games-group-timeline-item:last-child::after { display: none; }
   .games-group-timeline-meta { display: block; color: var(--dim); font-size: 12px; font-weight: 300; }
   .games-group-bar-row { display: flex; align-items: center; gap: 8px; min-height: 26px; font-size: 13px; }
-  .games-group-bar-name { width: 64px; flex: 0 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .games-group-bar-track { flex: 1 1 auto; height: 14px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .games-group-bar-name { width: 112px; flex: 0 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .games-group-bar-track { flex: 1 1 auto; height: 12px; border-radius: 4px; background: var(--line); overflow: hidden; }
   .games-group-bar { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
   .games-group-bar-count { width: 18px; text-align: center; font-size: 12px; }
   .games-group-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .games-group-stat { border-radius: 10px; background: var(--line); padding: 9px 10px; }
+  .games-group-stat { border-radius: 12px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); background: color-mix(in srgb, var(--accent) 7%, transparent); padding: 10px 12px; }
   .games-group-stat-label { display: block; color: var(--dim); font-size: 11px; }
-  .games-group-stat-value { display: block; font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .games-group-stat-value { display: block; color: var(--accent-fill); font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .games-group-edit { display: flex; align-items: center; gap: 12px; }
   .games-group-edit-avatar { width: 52px; height: 52px; font-size: 20px; border-style: dashed; }
   .games-group-edit-field { flex: 1 1 auto; min-width: 0; }
@@ -584,10 +587,13 @@
   .games-group-danger-item { text-align: center; }
   .games-group-role-head { display: flex; justify-content: space-between; color: var(--dim); font-size: 11px; margin-bottom: 2px; }
   .games-group-role-row { gap: 10px; }
-  .games-switch { position: relative; width: 38px; height: 22px; flex: 0 0 auto; border-radius: 999px; background: var(--line); transition: background-color .2s; }
-  .games-switch::after { content: ""; position: absolute; top: 3px; inset-inline-start: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--dim); transition: inset-inline-start .2s, background-color .2s; }
+  /* RTL like iOS: off keeps the knob on the right, on slides it left. Physical sides on purpose. */
+  .games-switch { position: relative; width: 40px; height: 24px; flex: 0 0 auto; border-radius: 999px; background: var(--line); transition: background-color .2s; }
+  .games-switch::after { content: ""; position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--dim); transition: right .2s, background-color .2s; }
   .games-switch.on { background: var(--accent); }
-  .games-switch.on::after { inset-inline-start: 19px; background: var(--bg); }
+  .games-switch.on::after { right: 19px; background: var(--bg); }
+  .games-switch:disabled { cursor: default; }
+  .games-switch:disabled:not(.on) { opacity: .5; }
   .games-group-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; display: flex; align-items: center; justify-content: center; background: var(--line); color: var(--dim); font-weight: 700; }
   .games-group-copy { flex: 1 1 auto; min-width: 0; }
   .games-group-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -1191,7 +1197,6 @@
     transition: background-color .2s, color .2s, border-color .2s;
   }
   .games-invite-action:hover { border-color: var(--accent); color: var(--accent); }
-  .games-invite-copied { color: var(--accent); font-size: 12px; font-weight: 500; animation: fadeIn .25s ease; }
   .games-invite-note { margin: 0; color: var(--dim); font-size: 12px; font-weight: 300; max-width: 280px; }
   .games-invite-revoke { color: var(--dim); font-size: 12px; font-weight: 400; padding: 4px 0; transition: color .2s; }
   .games-invite-revoke:hover { color: var(--bad); }
@@ -1400,7 +1405,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 104</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 105</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -7016,16 +7021,15 @@
     if (group.isMember) {
       const join = el("button", "games-group-player games-group-join");
       join.type = "button";
-      join.innerHTML = '<span class="games-group-join-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"></path></svg></span><span>צרף חבר</span>';
+      join.innerHTML = '<span>צרף חבר</span><svg class="games-group-join-plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"></path></svg>';
       join.addEventListener("click", () => shareGroupInvite(group));
       players.appendChild(join);
     }
     const members = activeMembers(collections.groupMembers, groupId);
     members.forEach(member => {
       const rowEl = el("div", "games-group-player");
-      const name = el("span", "games-member-name", member.displayName);
-      if (member.role === "admin") name.appendChild(el("span", "games-member-tag", "מנהל"));
-      rowEl.appendChild(name);
+      rowEl.appendChild(el("span", "games-member-name", member.displayName));
+      if (member.role === "admin") rowEl.appendChild(el("span", "games-group-player-meta", "מנהל"));
       players.appendChild(rowEl);
     });
     if (!members.length) players.appendChild(el("p", "games-empty", "אין חברים פעילים"));
@@ -7327,15 +7331,15 @@
       { key: "details", icon: "pencil", label: "פרטים", onClick: () => setGroupCardTab("details") },
       { key: "invite", icon: "link", label: "הזמנה", onClick: () => setGroupCardTab("invite") },
     ];
-    if (group.isAdmin) tiles.push({ key: "roles", icon: "shield", label: "ניהול", onClick: () => setGroupCardTab("roles") });
+    tiles.push({ key: "roles", icon: "shield", label: "ניהול", onClick: () => setGroupCardTab("roles") });
     content.appendChild(groupTileRow(tiles, tab));
     const view = el("div", "games-group-view anim" + (tab === "invite" ? " centered" : ""));
     if (tab === "invite") {
       const invite = renderGroupInvite(group, activeInvite(state.invites, groupId), group.isAdmin);
       if (invite) view.appendChild(invite);
       if (group.isAdmin) view.appendChild(renderAddMemberPanel());
-    } else if (tab === "roles" && group.isAdmin) {
-      renderGroupCardRoles(view, groupId);
+    } else if (tab === "roles") {
+      renderGroupCardRoles(view, groupId, group.isAdmin);
     } else {
       renderGroupCardDetailsForm(view, group);
     }
@@ -7450,9 +7454,10 @@
     groupCardArmedTimeout = null;
   }
 
-  // Roles: one switch per active member (on = admin). The group's last admin stays on, with a
-  // note instead of a switch that would refuse; an admin can still remove anyone else (red X).
-  function renderGroupCardRoles(view, groupId) {
+  // Roles: one switch per active member (on = admin). Every member sees who runs the group; only
+  // an admin can flip a switch. The group always keeps an admin: while only one is left, that
+  // switch stays on and locked (demoteMember refuses it too). An admin can also remove anyone else.
+  function renderGroupCardRoles(view, groupId, viewerIsAdmin) {
     const members = activeMembers(collectionsOf(state).groupMembers, groupId);
     const head = el("div", "games-group-role-head");
     head.append(el("span", "", "חבר"), el("span", "", "מנהל"));
@@ -7462,21 +7467,24 @@
       row.appendChild(el("span", "games-member-name", member.displayName));
       const isAdmin = member.role === "admin";
       const lastAdmin = isAdmin && isLastActiveAdmin(members, member.id);
-      if (!membershipMatchesUser(member, me) && !lastAdmin) row.appendChild(renderRemoveMemberButton(member));
-      if (lastAdmin) {
-        row.appendChild(el("span", "games-group-player-meta", "המנהל האחרון"));
+      if (viewerIsAdmin && !membershipMatchesUser(member, me) && !lastAdmin) row.appendChild(renderRemoveMemberButton(member));
+      const sw = el("button", "games-switch" + (isAdmin ? " on" : ""));
+      sw.type = "button";
+      sw.setAttribute("role", "switch");
+      sw.setAttribute("aria-checked", String(isAdmin));
+      sw.setAttribute("aria-label", member.displayName + " מנהל");
+      if (!viewerIsAdmin || lastAdmin) {
+        sw.disabled = true;
+        sw.setAttribute("aria-disabled", "true");
       } else {
-        const sw = el("button", "games-switch" + (isAdmin ? " on" : ""));
-        sw.type = "button";
-        sw.setAttribute("role", "switch");
-        sw.setAttribute("aria-checked", String(isAdmin));
-        sw.setAttribute("aria-label", member.displayName + " מנהל");
         sw.addEventListener("click", () => isAdmin ? demoteMember(member.groupId, member.id) : promoteMember(member.groupId, member.id));
-        row.appendChild(sw);
       }
+      row.appendChild(sw);
       view.appendChild(row);
     });
     if (!members.length) view.appendChild(el("p", "games-empty", "אין חברים פעילים"));
+    else if (!viewerIsAdmin) view.appendChild(el("p", "games-group-edit-hint", "רק מנהל יכול לשנות מי מנהל"));
+    else if (members.filter(m => m.role === "admin").length === 1) view.appendChild(el("p", "games-group-edit-hint", "בקבוצה תמיד יש לפחות מנהל אחד"));
   }
 
   function renderGroupSurface() {
@@ -8327,17 +8335,17 @@
     card.appendChild(code);
 
     const actions = el("div", "games-invite-actions");
+    // 2026-10-08: the button itself says "הועתק" for two seconds (no extra line beside it).
     const copyBtn = el("button", "games-invite-action", "העתק קישור");
     copyBtn.type = "button";
-    const copiedNote = el("span", "games-invite-copied", "הועתק ✓");
-    copiedNote.setAttribute("role", "status");
-    copiedNote.setAttribute("aria-live", "polite");
-    copiedNote.hidden = true;
+    copyBtn.setAttribute("aria-live", "polite");
+    let copiedTimer = null;
     copyBtn.addEventListener("click", () => {
       const link = inviteLink(invite.token, location.origin, location.pathname);
       const announceCopied = () => {
-        copiedNote.hidden = false;
-        setTimeout(() => { copiedNote.hidden = true; }, 2000);
+        copyBtn.textContent = "הועתק";
+        clearTimeout(copiedTimer);
+        copiedTimer = setTimeout(() => { copyBtn.textContent = "העתק קישור"; }, 2000);
       };
       const copyViaSelect = () => {
         const tmp = document.createElement("textarea");
@@ -8358,24 +8366,14 @@
       }
     });
     actions.appendChild(copyBtn);
-    actions.appendChild(copiedNote);
-
-    if (typeof navigator.share === "function") {
-      const shareBtn = el("button", "games-invite-action", "שתף");
-      shareBtn.type = "button";
-      shareBtn.addEventListener("click", () => {
-        const link = inviteLink(invite.token, location.origin, location.pathname);
-        navigator.share({ title: summary.name, url: link }).catch(() => {});
-      });
-      actions.appendChild(shareBtn);
-    }
 
     // Dedicated WhatsApp action: group invites in Israel travel over WhatsApp, and a ready-made
     // Hebrew message beats pasting a bare link into a chat. Prefers the native share sheet when the
     // platform has one (it already surfaces WhatsApp, plus everything else, for free); falls back to
     // a wa.me deep link — WhatsApp's own no-recipient "click to chat" URL — where navigator.share
-    // does not exist (desktop web).
-    const whatsappBtn = el("button", "games-invite-action", "וואטסאפ");
+    // does not exist (desktop web). It is the only share button: a separate "שתף" opened the very
+    // same share sheet on a phone (owner report, 2026-10-08), so it is labelled for what it opens.
+    const whatsappBtn = el("button", "games-invite-action", typeof navigator.share === "function" ? "שתף" : "וואטסאפ");
     whatsappBtn.type = "button";
     whatsappBtn.addEventListener("click", () => {
       const link = inviteLink(invite.token, location.origin, location.pathname);

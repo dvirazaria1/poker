@@ -82,7 +82,7 @@ test('the message survives encodeURIComponent for wa.me/?text= and decodes back 
 
 test('the WhatsApp share handler prefers navigator.share and falls back to wa.me', () => {
   const handler = sourceBetween(
-    '    const whatsappBtn = el("button", "games-invite-action", "וואטסאפ");',
+    '    const whatsappBtn = el("button", "games-invite-action", typeof navigator.share === "function" ? "שתף" : "וואטסאפ");',
     '    actions.appendChild(whatsappBtn);'
   );
   assert.match(

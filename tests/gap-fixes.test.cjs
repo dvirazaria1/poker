@@ -205,10 +205,12 @@ test('normalize() runs leaderRef through normalizeParticipantRef, stripping unkn
 
 // ---------- #9: accessibility — invite copied announcement, exit-toggle expanded state ----------
 
-test('the invite "copied" note is an announced live region', () => {
+test('the invite copy button announces "הועתק" on itself for two seconds', () => {
   const section = sourceBetween('function renderGroupInvite(', '  function renderGroupPage(');
-  assert.match(section, /copiedNote\.setAttribute\("role", "status"\)/);
-  assert.match(section, /copiedNote\.setAttribute\("aria-live", "polite"\)/);
+  assert.match(section, /copyBtn\.setAttribute\("aria-live", "polite"\)/);
+  assert.match(section, /copyBtn\.textContent = "הועתק";/);
+  assert.match(section, /setTimeout\(\(\) => \{ copyBtn\.textContent = "העתק קישור"; \}, 2000\)/);
+  assert.doesNotMatch(section, /copiedNote/);
 });
 
 test('the exit-toggle button exposes aria-expanded and aria-controls pointing at the exit panel', () => {

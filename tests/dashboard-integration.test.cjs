@@ -78,11 +78,13 @@ test('the open group card: a big table button, a "סטטיסטיקות" tile, th
 });
 
 test('details mode swaps the tiles for back / games / ranking / stats; settings mode for back / details / invite / roles', () => {
+  const roles = sourceBetween('  function renderGroupCardRoles(view, groupId, viewerIsAdmin) {', '  function renderGroupSurface() {');
+  assert.match(roles, /if \(!viewerIsAdmin \|\| lastAdmin\) \{\s*sw\.disabled = true;/);
   const details = sourceBetween('  function renderGroupCardDetails(content, group) {', '  function renderGroupCardTimeline(');
   ['"חזרה"', '"משחקים"', '"דירוג"', '"נתונים"'].forEach(label => assert.ok(details.includes(label), label));
   const settings = sourceBetween('  function renderGroupCardSettings(content, group) {', '  function renderGroupCardDetailsForm(');
   ['"חזרה"', '"פרטים"', '"הזמנה"', '"ניהול"'].forEach(label => assert.ok(settings.includes(label), label));
-  assert.match(settings, /if \(group\.isAdmin\) tiles\.push\(\{ key: "roles"/);
+  assert.match(settings, /tiles\.push\(\{ key: "roles"/);
 });
 
 test('groupCardStats averages pots and durations, ignoring missing durations', () => {
