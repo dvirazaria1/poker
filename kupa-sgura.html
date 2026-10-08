@@ -1577,7 +1577,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 118</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 119</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -7207,16 +7207,11 @@
     if (tab === current) return;
     expandedGroupTab = tab;
     disarmGroupCardAction();
-    if (expandedGroupMode === "settings") {
-      // Settings tabs (owner, 2026-10-08): the new view comes in from the side its tab is on. In
-      // RTL the earlier tab sits to the right, so a tab to the right of the current one is
-      // "forward" (enters from the right), one to its left enters from the left.
-      const order = ["details", "invite", "roles"];
-      turnGroupCardPage([".games-group-view"], { axis: "x", forward: order.indexOf(tab) < order.indexOf(current) });
-    } else {
-      // Statistics tabs keep moving the way statistics opened (leftwards).
-      turnGroupCardPage([".games-group-view"], { axis: "x", forward: true });
-    }
+    // Tabs (owner, 2026-10-08): the new view comes in from the side its tab is on. In RTL the
+    // earlier tab sits to the right, so a tab to the right of the current one is "forward"
+    // (enters from the right) and one to its left enters from the left.
+    const order = expandedGroupMode === "settings" ? ["details", "invite", "roles"] : ["games", "ranking", "stats"];
+    turnGroupCardPage([".games-group-view"], { axis: "x", forward: order.indexOf(tab) < order.indexOf(current) });
   }
 
   // Re-renders the dashboard and turns each region of the open card named in `selectors` (the
