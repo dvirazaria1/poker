@@ -433,7 +433,9 @@ test('renderGamesDashboard opens with a title like the friends page, then the le
   // padding puts it at the same height (measured: both tops at 98px on a 375x812 viewport).
   const source = sourceBetween('  function renderGamesDashboard() {', '  function renderGroupHeader(');
   assert.match(source, /el\("div", "games-home-in games-home-dash"\)/);
-  assert.match(source, /inner\.appendChild\(el\("h2", "games-home-title", "השולחנות שלך"\)\);\s*inner\.appendChild\(el\("p", "games-home-lead", "המשחקים הפעילים והקבוצות שלך במקום אחד\."\)\);\s*renderQuickActions\(inner\);/);
+  assert.match(source, /inner\.appendChild\(el\("h2", "games-home-title", "השולחנות שלך"\)\);\s*inner\.appendChild\(el\("p", "games-home-lead", "המשחקים הפעילים והקבוצות שלך במקום אחד\."\)\);\s*renderActiveGamesSection\(/);
+  // 2026-10-08: "משחק ללא קבוצה" is a dashed card that closes the group list.
+  assert.match(source, /renderGroupsSection\([^;]*;\s*renderQuickActions\(inner\);/);
   assert.match(html, /\.games-home-title \{[^}]*font-size: 20px; font-weight: 800;/);
   assert.match(html, /\.games-home-dash \{ padding-top: 4px; \}/);
   assert.match(html, /\.games-home-lead \{[^}]*margin: 0 0 26px;/);

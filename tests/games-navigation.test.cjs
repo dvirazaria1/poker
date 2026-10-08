@@ -174,8 +174,9 @@ test('Games dashboard centers its visible content while preserving RTL text dire
   assert.match(html, /document\.body\.classList\.toggle\("games-view", appView === "games"\)/);
   assert.match(html, /\.games-view header \{ text-align: center; \}/);
   assert.match(html, /\.games-home \{[^}]*text-align: center;/s);
-  assert.match(html, /\.games-active-card, \.games-group-card \{[^}]*text-align: center;/s);
-  assert.match(html, /\.games-card-actions \{[^}]*justify-content: center;/s);
+  // 2026-10-08 layout 1: the cards themselves are bordered and read from the start side.
+  assert.match(html, /\.games-active-card, \.games-group-card \{[^}]*border-radius: 16px; text-align: start;/s);
+  assert.match(html, /\.games-active-card, \.games-group-card\.has-game \{ border-color: var\(--accent\); \}/);
   assert.match(html, /direction: rtl;/);
 });
 

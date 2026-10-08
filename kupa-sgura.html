@@ -463,17 +463,32 @@
   }
   .games-quick-action.primary { border-color: var(--accent); color: var(--accent); }
   .games-quick-action:disabled { opacity: .45; cursor: default; color: var(--faint); }
-  .games-active-card, .games-group-card { padding: 15px 0; border-bottom: 1px solid var(--line); text-align: center; }
-  .games-group-list { border-top: 1px solid var(--line); }
-  .games-group-list .games-group-card { padding: 10px 0; }
+  /* 2026-10-08 (owner pick, layout 1 + button C): "משחק ללא קבוצה" is a dashed card that closes
+     the group list, the same shape as the cards above it, so it reads as "one more table". */
+  .games-quick-section { margin-top: 8px; }
+  .games-home-dash .games-section { text-align: start; }
+  .games-solo-card {
+    width: 100%; min-height: 60px; padding: 12px; justify-content: flex-start; gap: 10px;
+    border: 1px dashed var(--faint); border-radius: 16px; color: var(--dim);
+  }
+  .games-solo-icon { width: 34px; height: 34px; flex: 0 0 auto; border-radius: 50%; border: 1px dashed var(--faint); display: flex; align-items: center; justify-content: center; }
+  .games-solo-icon svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  /* Layout 1: every table and group is its own bordered card; one with a live game gets the accent border. */
+  .games-active-card, .games-group-card { padding: 12px; border: 1px solid var(--line); border-radius: 16px; text-align: start; }
+  .games-active-card, .games-group-card.has-game { border-color: var(--accent); }
+  .games-active-card + .games-active-card { margin-top: 8px; }
+  .games-group-list { display: flex; flex-direction: column; gap: 8px; }
+  .games-active-head { display: flex; align-items: center; gap: 10px; }
+  .games-active-copy { flex: 1 1 auto; min-width: 0; }
+  .games-group-chevron { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: var(--faint); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .games-card-status { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); font-size: 11px; font-weight: 400; }
   .games-card-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
   .games-card-status.settlement::before { background: var(--faint); }
   .games-card-title { display: block; color: var(--text); font-size: 16px; font-weight: 700; }
   .games-card-meta, .games-card-time { display: block; color: var(--dim); font-size: 12px; font-weight: 300; }
   .games-card-time { margin-top: 2px; }
-  .games-card-actions { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 10px; }
-  .games-card-enter { border: 1px solid var(--accent); border-radius: 999px; color: var(--accent); font-size: 13px; font-weight: 700; padding: 6px 15px; min-height: 34px; transition: background-color .2s, color .2s, border-color .2s; }
+  .games-card-actions { display: flex; align-items: center; justify-content: flex-start; gap: 18px; margin-top: 4px; }
+  .games-card-enter { flex: 0 0 auto; border: 1px solid var(--accent); border-radius: 999px; color: var(--accent); font-size: 13px; font-weight: 700; padding: 6px 15px; min-height: 34px; transition: background-color .2s, color .2s, border-color .2s; }
   .games-card-toggle { display: inline-flex; align-items: center; gap: 5px; color: var(--dim); font-size: 12px; padding: 6px 0; transition: color .2s; }
   .games-card-toggle:hover { color: var(--accent); }
   .games-card-toggle svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform .22s ease; }
@@ -482,7 +497,7 @@
   .games-card-details.open { grid-template-rows: 1fr; visibility: visible; }
   .games-card-details-in { min-height: 0; overflow: hidden; }
   .games-card-details-content { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
-  .games-detail-row { display: flex; align-items: baseline; justify-content: center; gap: 8px; padding: 3px 0; font-size: 12px; }
+  .games-detail-row { display: flex; align-items: baseline; justify-content: flex-start; gap: 8px; padding: 3px 0; font-size: 12px; }
   .games-detail-name { color: var(--text); font-weight: 600; }
   .games-detail-meta { color: var(--dim); font-weight: 300; font-variant-numeric: tabular-nums; }
   .games-detail-totals { color: var(--dim); font-size: 12px; font-weight: 300; margin: 8px 0 0; }
@@ -1124,6 +1139,7 @@
     .exit-confirm:hover { background: var(--bad-press); border-color: var(--bad-press); color: var(--bg); }
     .games-quick-action.primary:hover { background: var(--accent); color: var(--bg); }
     .games-card-enter:hover { background: var(--accent); color: var(--bg); }
+    .games-solo-card:hover, .games-solo-card:hover .games-solo-icon { border-color: var(--accent); color: var(--accent); }
     .games-create-submit:hover { background: var(--accent); color: var(--bg); }
     .btn-close-table:hover { background: var(--accent); color: var(--bg); }
     .btn-close-table.warn-state:hover { background: var(--bad); color: var(--bg); box-shadow: none; }
@@ -1304,7 +1320,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 100</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 101</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -6481,8 +6497,9 @@
     const actions = el("div", "games-quick-actions");
     actions.classList.add("single");
 
-    const start = el("button", "games-quick-action", "משחק ללא קבוצה");
+    const start = el("button", "games-quick-action games-solo-card");
     start.type = "button";
+    start.innerHTML = '<span class="games-solo-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="10" height="14" rx="2"></rect><path d="M10 4.5 12 4a2 2 0 0 1 2.4 1.4l3.3 11.6"></path></svg></span><span>משחק ללא קבוצה</span>';
     // Round 2: an open table elsewhere never blocks a new one; each has its own card above.
     start.addEventListener("click", startUngroupedGame);
 
@@ -6585,22 +6602,27 @@
   function renderActiveGameCard(summary, actions) {
     const card = el("article", "games-active-card" + (actions.anim ? " anim" : ""));
     if (actions.anim) card.style.animationDelay = (actions.animDelay || 0) + "ms";
-    const status = el("span", "games-card-status" + (summary.phase === "settlement" ? " settlement" : ""), summary.phase === "settlement" ? "בסגירה" : "משחק פעיל");
-    card.appendChild(status);
-    if (summary.title) card.appendChild(el("span", "games-card-title", summary.title));
-    card.appendChild(el("span", "games-card-meta", formatPlayerCount(summary.playerCount) + " · " + formatPlayerNames(summary.playerNames)));
-    if (summary.startedAt) card.appendChild(el("span", "games-card-time", "התחיל ב־" + formatGameTime(summary.startedAt)));
-
-    const cardActions = el("div", "games-card-actions");
+    // Layout 1: copy on the start side, "כנס לשולחן" beside it; the expand toggle sits underneath.
+    const head = el("div", "games-active-head");
+    const copy = el("div", "games-active-copy");
+    const status = el("span", "games-card-status" + (summary.phase === "settlement" ? " settlement" : ""), (summary.phase === "settlement" ? "בסגירה" : "משחק פעיל") + " · " + fmt(summary.potSize) + " בקופה");
+    copy.appendChild(status);
+    if (summary.title) copy.appendChild(el("span", "games-card-title", summary.title));
+    copy.appendChild(el("span", "games-card-meta", formatPlayerCount(summary.playerCount) + " · " + formatPlayerNames(summary.playerNames)));
+    if (summary.startedAt) copy.appendChild(el("span", "games-card-time", "התחיל ב־" + formatGameTime(summary.startedAt)));
     const enter = el("button", "games-card-enter", "כנס לשולחן");
     enter.type = "button";
     enter.addEventListener("click", actions.onEnter);
+    head.append(copy, enter);
+    card.appendChild(head);
+
+    const cardActions = el("div", "games-card-actions");
     const toggle = el("button", "games-card-toggle");
     toggle.type = "button";
     toggle.setAttribute("aria-expanded", actions.expanded ? "true" : "false");
     toggle.innerHTML = '<span>' + (actions.expanded ? "כווץ" : "הרחב") + '</span><svg viewBox="0 0 12 12" aria-hidden="true"><path d="m2.5 4.5 3.5 3 3.5-3"></path></svg>';
     toggle.addEventListener("click", actions.onToggle);
-    cardActions.append(enter, toggle);
+    cardActions.append(toggle);
     card.appendChild(cardActions);
 
     const details = el("div", "games-card-details" + (actions.expanded ? " open" : ""));
@@ -6651,7 +6673,7 @@
   }
 
   function renderGroupCard(group, actions) {
-    const card = el("article", "games-group-card" + (actions.anim ? " anim" : ""));
+    const card = el("article", "games-group-card" + (group.hasActiveGame ? " has-game" : "") + (actions.anim ? " anim" : ""));
     if (actions.anim) card.style.animationDelay = (actions.animDelay || 0) + "ms";
     const head = el("div", "games-group-head");
     head.setAttribute("role", "button");
@@ -6686,6 +6708,7 @@
       copy.appendChild(el("span", "games-card-status" + (isSettlement ? " settlement" : ""), isSettlement ? "בסגירה" : "משחק פעיל"));
     }
     head.appendChild(copy);
+    head.insertAdjacentHTML("beforeend", '<svg class="games-group-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg>');
     card.appendChild(head);
     return card;
   }
@@ -6811,9 +6834,9 @@
     const inner = el("div", "games-home-in games-home-dash");
     inner.appendChild(el("h2", "games-home-title", "השולחנות שלך"));
     inner.appendChild(el("p", "games-home-lead", "המשחקים הפעילים והקבוצות שלך במקום אחד."));
-    renderQuickActions(inner);
     renderActiveGamesSection(inner, getActiveGameSummaries(state, state.groups), enterStagger);
     renderGroupsSection(inner, getGroupSummaries(collectionsOf(state), me, cloudGroupAggregates), enterStagger);
+    renderQuickActions(inner);
     renderArchivedGroupsSection(inner, getArchivedGroupSummaries(collectionsOf(state), me, cloudGroupAggregates));
     box.appendChild(inner);
   }
