@@ -37,6 +37,7 @@ test('the UI reads the gate from the live client, the first session answer and t
 
 test('the hand: riffle, deal two to four seats, flop, show, gather -- and the caption follows', () => {
   ['"מערבבים"', '"מחלקים"', '"פלופ"', '"פותחים קלפים"', '"רגע, מתחברים"'].forEach(s => assert.ok(game.includes('dealSay(slot, ' + s + ')'), s));
+  assert.match(game, /\[\[3, "טרן"\], \[4, "ריבר"\]\]/, 'the turn and the river follow the flop');
   assert.match(game, /navigator\.onLine === false \? "אין חיבור לאינטרנט" : text/);
   assert.match(game, /const DEAL_SEATS = \[\[-86, -26\], \[-30, -36\], \[30, -36\], \[86, -26\]\];/);
   assert.match(game, /node\.setAttribute\("role", "status"\);/);
@@ -55,9 +56,12 @@ test('one instance per surface survives re-renders; leaving gathers, folds and r
   assert.match(game, /if \(!slot\.leaving\) leaveConnectingSlot\(key, slot\);/);
   const leave = sourceBetween('  async function leaveConnectingSlot(key, slot) {', '  function renderConnectingSlot(');
   assert.match(leave, /await Promise\.resolve\(\);\n    if \(!dealStill\(\) && slot\.node\.isConnected\)/);
-  assert.match(leave, /await dealGather\(/);
+  assert.match(leave, /dealGather\(cards, /);
+  assert.match(leave, /slot\.node\.classList\.add\("leaving"\);/);
+  assert.match(game, /function dealFrozen\(target, o\) \{ return !o\.exit && !!target\.closest\("\.connecting\.leaving"\); \}/);
   assert.match(leave, /height: "0px"/);
-  assert.match(leave, /await Promise\.race\(\[fold, dealWait\(1200\)\]\);/);
+  assert.match(leave, /await dealWait\(\(cards\.length - 1\) \* 24 \+ 300\);/);
+  assert.match(leave, /await dealWait\(280\);/);
   assert.match(leave, /slot\.node\.remove\(\);/);
   assert.match(leave, /clearInterval\(slot\.beat\);/);
   assert.match(game, /slot\.beat = setInterval\(\(\) => \{ if \(slot\.node\.getClientRects\(\)\.length\) slot\.seenAt = performance\.now\(\); \}, 250\);/);
@@ -82,4 +86,14 @@ test('cards draw only from tokens, so both themes work', () => {
   assert.match(html, /\.deal-card\.face \{ background: var\(--card-face\); border-color: var\(--card-back\); \}/);
   assert.match(html, /--deal-stripe: rgba\(53,224,220,\.28\);/);
   assert.match(html, /--deal-stripe: rgba\(8,158,152,\.30\);/);
+});
+
+test('a five-card board dealt like a casino: the flop leaves the deck as one stack, turns as one, fans out', () => {
+  assert.match(game, /const DEAL_BOARD = \[\[-44, 6\], \[-22, 6\], \[0, 6\], \[22, 6\], \[44, 6\]\];/);
+  assert.match(game, /slot\.cards\.board = Array\.from\(\{ length: 5 \}, \(\) => dealCard\(stage\)\);/);
+  const hand = sourceBetween('  async function runDealerHand(slot) {', '  async function runMiniRiffle(slot) {');
+  const flop = hand.indexOf('dealSay(slot, "פלופ")'), stack = hand.indexOf('await dealFlipTogether('), fan = hand.indexOf('// fan the flop out'), turn = hand.indexOf('[[3, "טרן"], [4, "ריבר"]]');
+  assert.ok(flop >= 0 && stack > flop && fan > stack && turn > fan, 'flop stack -> flip together -> fan -> turn, river');
+  // no seat markers any more: the hole cards are the players
+  assert.doesNotMatch(html, /deal-seat/);
 });

@@ -960,7 +960,7 @@
   .connecting.full { margin-top: 18px; }
   .connecting.mini { flex-direction: row; justify-content: center; gap: 10px; margin: 6px 0 4px; min-height: 30px; }
   .connecting-stage { position: relative; flex: 0 0 auto; }
-  .connecting.full .connecting-stage { width: 236px; height: 118px; }
+  .connecting.full .connecting-stage { width: 236px; height: 104px; }
   .connecting.mini .connecting-stage { width: 34px; height: 24px; }
   .connecting-cap { margin-top: 6px; min-height: 18px; color: var(--dim); font-size: 12px; font-weight: 300; }
   .connecting.mini .connecting-cap { margin-top: 0; }
@@ -975,10 +975,6 @@
   .deal-card.face { background: var(--card-face); border-color: var(--card-back); }
   .deal-card.red { color: var(--card-red); }
   .deal-card.win { box-shadow: 0 0 0 1px var(--accent), 0 0 8px var(--avatar-tint-edge); }
-  .deal-seat {
-    position: absolute; left: 50%; top: 50%; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px;
-    box-sizing: border-box; border-radius: 50%; border: 1px solid var(--avatar-ring);
-  }
   .empty-note { color: var(--dim); font-size: 14px; font-weight: 300; margin-top: 10px; }
   .legal-links { color: var(--dim); font-size: 12px; font-weight: 300; margin-top: 8px; }
   .legal-links a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
@@ -12113,15 +12109,18 @@
   const DEAL_SUITS = [["♠︎", false], ["♥︎", true], ["♣︎", false], ["♦︎", true]];
   const DEAL_DECK = [0, 42];
   const DEAL_SEATS = [[-86, -26], [-30, -36], [30, -36], [86, -26]];
-  const DEAL_FLOP = [[24, 6], [0, 6], [-24, 6]];
+  const DEAL_BOARD = [[-44, 6], [-22, 6], [0, 6], [22, 6], [44, 6]]; // opened left to right, like a dealer facing the table
   function dealStill() { return matchMedia("(prefers-reduced-motion: reduce)").matches; }
   function dealT(x, y, r, s, ry) {
     return "translate(" + x + "px," + y + "px) rotate(" + (r || 0) + "deg)" +
       (ry != null ? " rotateY(" + ry + "deg)" : "") + " scale(" + (s == null ? 1 : s) + ")";
   }
-  // A cancelled animation rejects `finished`; the hand simply moves on.
+  // A cancelled animation rejects `finished`; the hand simply moves on. Once a slot is leaving
+  // (.leaving), only the exit itself may move anything -- the hand's own moves become no-ops.
+  function dealFrozen(target, o) { return !o.exit && !!target.closest(".connecting.leaving"); }
   function dealMove(target, frames, opts) {
     const o = opts || {};
+    if (dealFrozen(target, o)) return Promise.resolve();
     return target.animate(frames, {
       duration: o.d || 300, delay: o.delay || 0, easing: o.e || "cubic-bezier(.2,.8,.2,1)", fill: "forwards",
     }).finished.catch(() => {});
@@ -12129,6 +12128,7 @@
   function dealWait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
   function dealCard(stage) { const card = el("span", "deal-card"); stage.appendChild(card); return card; }
   function dealPlace(card, x, y, r, opacity) {
+    if (dealFrozen(card, {})) return;
     card.getAnimations().forEach(a => a.cancel());
     card.style.transform = dealT(x, y, r);
     card.style.opacity = String(opacity);
@@ -12156,12 +12156,18 @@
     return Promise.all(cards.map((card, i) => dealMove(card, [
       { transform: getComputedStyle(card).transform, opacity: getComputedStyle(card).opacity },
       { transform: dealT(deck[0], deck[1], 0), opacity: 0 },
-    ], { d: 300, delay: i * 24, e: "cubic-bezier(.6,0,.3,1)" })));
+    ], { d: 300, delay: i * 24, e: "cubic-bezier(.6,0,.3,1)", exit: true })));
   }
   async function dealTurn(card, x, y, r, suit) {
     await dealMove(card, [{ transform: dealT(x, y, r, 1, 0) }, { transform: dealT(x, y - 2, r, 1.1, 90) }], { d: 120, e: "ease-in" });
     dealFace(card, suit);
     await dealMove(card, [{ transform: dealT(x, y - 2, r, 1.1, -90) }, { transform: dealT(x, y, r, 1, 0) }], { d: 150, e: "ease-out" });
+  }
+  // Several cards turned over as one, in place -- the casino flop: three off the deck in a stack.
+  async function dealFlipTogether(cards, x, y, suits) {
+    await Promise.all(cards.map((card, k) => dealMove(card, [{ transform: dealT(x, y - k * 0.8, 0, 1, 0) }, { transform: dealT(x, y - k * 0.8 - 2, 0, 1.1, 90) }], { d: 140, e: "ease-in" })));
+    cards.forEach((card, k) => dealFace(card, suits[k]));
+    await Promise.all(cards.map((card, k) => dealMove(card, [{ transform: dealT(x, y - k * 0.8 - 2, 0, 1.1, -90) }, { transform: dealT(x, y - k * 0.8, 0, 1, 0) }], { d: 160, e: "ease-out" })));
   }
   // Split, interleave, square. Returns whether the slot is still worth animating.
   async function dealRiffle(slot, deck, spread) {
@@ -12192,7 +12198,7 @@
   async function runDealerHand(slot) {
     const c = slot.cards, deck = DEAL_DECK;
     for (;;) {
-      c.hole.concat(c.flop).forEach(card => { dealBack(card); dealPlace(card, deck[0], deck[1], 0, 0); card.style.zIndex = ""; });
+      c.hole.concat(c.board).forEach(card => { dealBack(card); dealPlace(card, deck[0], deck[1], 0, 0); card.style.zIndex = ""; });
       c.base.forEach(card => dealPlace(card, deck[0], deck[1], 0, 0));
       dealSay(slot, "מערבבים");
       if (!(await dealRiffle(slot, deck, 17))) return;
@@ -12210,14 +12216,28 @@
       }
       await dealWait(420);
       if (!slotAlive(slot)) return;
+      // The flop, the casino way: three cards leave the deck as one stack, turn over together and
+      // are fanned out; then the turn and the river, one card each, turned in place.
       dealSay(slot, "פלופ");
-      for (let f = 0; f < 3; f++) {
-        c.flop[f].style.zIndex = String(40 + f);
-        dealMove(c.flop[f], [{ transform: dealT(deck[0], deck[1], 0), opacity: 1 }, { transform: dealT(DEAL_FLOP[f][0], DEAL_FLOP[f][1], 0), opacity: 1 }]);
-        await dealWait(150);
+      const flop = c.board.slice(0, 3), at = DEAL_BOARD[0];
+      await Promise.all(flop.map((card, k) => {
+        card.style.zIndex = String(40 + k);
+        return dealMove(card, [{ transform: dealT(deck[0], deck[1], 0), opacity: 1 }, { transform: dealT(at[0], at[1] - k * 0.8, 0), opacity: 1 }], { d: 340, delay: k * 35 });
+      }));
+      await dealWait(200);
+      await dealFlipTogether(flop, at[0], at[1], flop.map(dealRandomSuit));
+      await dealWait(160);
+      // fan the flop out: the top card travels furthest
+      await Promise.all(flop.map((card, k) => dealMove(card, [{ transform: dealT(at[0], at[1] - k * 0.8, 0) }, { transform: dealT(DEAL_BOARD[k][0], DEAL_BOARD[k][1], 0) }], { d: 360, e: "cubic-bezier(.3,.7,.2,1)" })));
+      for (const [i, name] of [[3, "טרן"], [4, "ריבר"]]) {
+        await dealWait(420);
+        if (!slotAlive(slot)) return;
+        dealSay(slot, name);
+        c.board[i].style.zIndex = String(40 + i);
+        await dealMove(c.board[i], [{ transform: dealT(deck[0], deck[1], 0), opacity: 1 }, { transform: dealT(DEAL_BOARD[i][0], DEAL_BOARD[i][1], 0), opacity: 1 }], { d: 320 });
+        await dealWait(140);
+        await dealTurn(c.board[i], DEAL_BOARD[i][0], DEAL_BOARD[i][1], 0, dealRandomSuit());
       }
-      await dealWait(380);
-      for (let f = 0; f < 3; f++) { await dealTurn(c.flop[f], DEAL_FLOP[f][0], DEAL_FLOP[f][1], 0, dealRandomSuit()); await dealWait(70); }
       await dealWait(500);
       if (!slotAlive(slot)) return;
       dealSay(slot, "פותחים קלפים");
@@ -12236,7 +12256,7 @@
       await dealWait(1100);
       if (!slotAlive(slot)) return;
       dealSay(slot, "רגע, מתחברים");
-      await dealGather(c.hole.concat(c.flop), deck);
+      await dealGather(c.hole.concat(c.board), deck);
       await dealWait(250);
       if (!slotAlive(slot)) return;
     }
@@ -12254,7 +12274,7 @@
     if (slot.kind === "mini") { c.riffle.forEach((card, i) => dealPlace(card, 0, -i * 0.8, 0, 1)); return; }
     c.base.forEach((card, k) => dealPlace(card, DEAL_DECK[0], DEAL_DECK[1] - k, 0, 1));
     c.hole.forEach((card, i) => { const p = dealHolePos(i); dealPlace(card, p[0], p[1], p[2], 1); });
-    c.flop.forEach((card, i) => { dealFace(card, DEAL_SUITS[i]); dealPlace(card, DEAL_FLOP[i][0], DEAL_FLOP[i][1], 0, 1); });
+    c.board.forEach((card, i) => { dealFace(card, DEAL_SUITS[i % DEAL_SUITS.length]); dealPlace(card, DEAL_BOARD[i][0], DEAL_BOARD[i][1], 0, 1); });
   }
   function buildConnectingSlot(kind) {
     const node = el("div", "connecting " + kind);
@@ -12270,15 +12290,10 @@
     // only a heartbeat can tell a visible slot from one whose screen was left while connecting.
     slot.beat = setInterval(() => { if (slot.node.getClientRects().length) slot.seenAt = performance.now(); }, 250);
     if (kind === "full") {
-      DEAL_SEATS.forEach(s => {
-        const seat = el("span", "deal-seat");
-        seat.style.transform = "translate(" + s[0] + "px," + (s[1] - 17) + "px)";
-        stage.appendChild(seat);
-      });
       slot.cards.base = [dealCard(stage), dealCard(stage)];
       slot.cards.riffle = Array.from({ length: 6 }, () => dealCard(stage));
       slot.cards.hole = Array.from({ length: 8 }, () => dealCard(stage));
-      slot.cards.flop = Array.from({ length: 3 }, () => dealCard(stage));
+      slot.cards.board = Array.from({ length: 5 }, () => dealCard(stage));
     } else {
       slot.cards.riffle = Array.from({ length: 6 }, () => dealCard(stage));
     }
@@ -12291,22 +12306,24 @@
   }
   async function leaveConnectingSlot(key, slot) {
     slot.leaving = true;
+    slot.node.classList.add("leaving");
     clearInterval(slot.beat);
     // Surfaces build their section off-document and attach it at the end of the (synchronous)
     // render: let that finish so the fold has a node on the page to animate.
     await Promise.resolve();
     if (!dealStill() && slot.node.isConnected) {
-      const deck = slot.kind === "full" ? DEAL_DECK : [0, 0];
-      const fold = (async () => {
-        await dealGather(Object.values(slot.cards).flat(), deck);
-        const cs = getComputedStyle(slot.node);
-        await dealMove(slot.node, [
-          { height: slot.node.offsetHeight + "px", marginTop: cs.marginTop, marginBottom: cs.marginBottom, opacity: 1 },
-          { height: "0px", marginTop: "0px", marginBottom: "0px", opacity: 0 },
-        ], { d: 260, e: "ease-in-out" });
-      })();
-      // A hidden page freezes the animation timeline: never let the slot outlive its state for that.
-      await Promise.race([fold, dealWait(1200)]);
+      // Paced by the clock, not by the animations' promises: the gather (the last card leaves after
+      // 20 x 24ms + 300ms), then the fold. A hidden page freezes the animations but not the clock,
+      // so the slot never outlives its state.
+      const cards = Object.values(slot.cards).flat();
+      dealGather(cards, slot.kind === "full" ? DEAL_DECK : [0, 0]);
+      await dealWait((cards.length - 1) * 24 + 300);
+      const cs = getComputedStyle(slot.node);
+      dealMove(slot.node, [
+        { height: slot.node.offsetHeight + "px", marginTop: cs.marginTop, marginBottom: cs.marginBottom, opacity: 1 },
+        { height: "0px", marginTop: "0px", marginBottom: "0px", opacity: 0 },
+      ], { d: 260, e: "ease-in-out", exit: true });
+      await dealWait(280);
     }
     slot.node.remove();
     if (connectingSlots.get(key) === slot) connectingSlots.delete(key);
