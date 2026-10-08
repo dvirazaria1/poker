@@ -183,7 +183,8 @@ test('the settings overlay shows the signed-in address and no new localStorage k
 test('the settings overlay has a sign-in control, hidden by default, above the sign-out button', () => {
   const settings = html.slice(html.indexOf('<div class="login" id="settings"'), html.indexOf('<div class="login" id="groupSettings"'));
   assert.match(settings, /<p class="games-primary-reason" id="setSignInNote" hidden>[^<]*<\/p>/);
-  assert.match(settings, /<button type="button" class="set-flat" id="setSignInBtn" hidden>התחבר עם חשבון<\/button>/);
+  // 2026-10-08 settings list: the sign-in is the screen's one filled button for a local player
+  assert.match(settings, /<button type="button" class="btn-primary btn-fill set-signin-btn" id="setSignInBtn" hidden>התחברות עם חשבון<\/button>/);
   // The note and the sign-in button must both come before #setSwapBtn in source order.
   const noteIdx = settings.indexOf('id="setSignInNote"');
   const btnIdx = settings.indexOf('id="setSignInBtn"');

@@ -152,15 +152,20 @@ test('the SQL function is SECURITY DEFINER, resolves only the caller via auth.ui
 
 // ---------- kupa-sgura.html: the danger zone ----------
 
-test('the danger zone (heading + entry point) is gated on authUser, and the markup starts hidden', () => {
+test('account deletion is gated on authUser and starts hidden; the danger-zone heading shows for everyone', () => {
   const start = html.indexOf('function refreshSettings()');
   const close = html.indexOf('\n  }', start);
   assert.ok(start >= 0 && close > start, 'missing refreshSettings()');
   const body = html.slice(start, close);
-  assert.match(body, /setDangerTitle"\)\.hidden = !authUser/);
   assert.match(body, /setDeleteAccountToggle"\)\.hidden = !authUser/);
-  assert.match(html, /<p class="settings-danger-title" id="setDangerTitle" hidden>אזור מסוכן<\/p>/);
   assert.match(html, /<button[^>]*id="setDeleteAccountToggle" hidden/);
+  // 2026-10-08 settings list: "איפוס רקורד" lives in the danger zone for a local player too, so
+  // its heading is never hidden.
+  assert.match(html, /<p class="settings-danger-title" id="setDangerTitle">אזור מסוכן<\/p>/);
+  assert.doesNotMatch(body, /setDangerTitle/);
+  const danger = html.slice(html.indexOf('id="setDangerTitle"'), html.indexOf('id="setDeleteAccountPanel"'));
+  assert.match(danger, /id="setClearBtn"/);
+  assert.match(danger, /id="setDeleteAccountToggle"/);
 });
 
 test('confirmation is the one-second hold pattern (not a second click-to-arm), and failure never touches local state before the RPC confirms', () => {
