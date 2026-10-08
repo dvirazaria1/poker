@@ -1820,7 +1820,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 147</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 148</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -2640,7 +2640,7 @@
 
   // `authUser` is declared further down, in the auth section; every caller here runs after boot.
   function cloudMode() { return !!(supabase && authUser); }
-  function gateNow() { return connectionGate(!!supabase, authSessionChecked, !!authUser); }
+  function gateNow() { return connectionGate(!!supabase, authSessionSettled(), !!authUser); }
 
   // The four honest sync-dot states, computed fresh from the current truth every time -- never a
   // fifth ad-hoc label. See cloudSyncLabel (cloud mapping (pure)) for the branching itself.
@@ -10156,6 +10156,12 @@
   let authResendTimer = null;     // ticks the 60s resend countdown (Supabase's own rate window)
   let authResendUntil = 0;
   let authSessionChecked = false; // the first getSession() answered -- ends "connecting" (connectionGate)
+  // Owner, 2026-10-08: a saved account answered getSession() at once, but its profile took ~2s
+  // more to load, and for those seconds the screens said "יש ליצור קודם חשבון". "Signed out" now
+  // waits for any profile still loading AND two spare seconds after the first answer.
+  const AUTH_SETTLE_GRACE_MS = 2000;
+  let authSettleUntil = 0;
+  function authSessionSettled() { return authSessionChecked && !authPendingUserId && Date.now() >= authSettleUntil; }
 
   function emailLocalPart(email) {
     const at = typeof email === "string" ? email.indexOf("@") : -1;
@@ -10253,6 +10259,7 @@
       const firstFailure = authProfileFailedUserId !== user.id;
       authProfileFailedUserId = user.id;
       renderAuthProfileState();
+      render(); // the loading profile kept the screens on "connecting"; now they can say why
       if (firstFailure) showLogin();
       return;
     }
@@ -10285,14 +10292,20 @@
 
   // With no session nothing else re-renders, so the screens leave "connecting" here.
   function refreshAfterSessionCheck() { if (!authUser) { render(); refreshInviteNotices(); } }
+  // The first answer starts the settle clock; when it runs out the screens are drawn once more.
+  function noteSessionChecked() {
+    authSessionChecked = true;
+    authSettleUntil = Date.now() + AUTH_SETTLE_GRACE_MS;
+    setTimeout(refreshAfterSessionCheck, AUTH_SETTLE_GRACE_MS);
+  }
   function initAuth() {
     if (!supabase) return;
     supabase.auth.getSession().then(async ({ data, error }) => {
-      authSessionChecked = true;
+      noteSessionChecked();
       if (error) { if (isInvalidSessionError(error)) await applySession(null); }
       else await applySession(data && data.session);
       refreshAfterSessionCheck();
-    }).catch(() => { authSessionChecked = true; refreshAfterSessionCheck(); });
+    }).catch(() => { noteSessionChecked(); refreshAfterSessionCheck(); });
     supabase.auth.onAuthStateChange((event, session) => { applySession(session); });
   }
 

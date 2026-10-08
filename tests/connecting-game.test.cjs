@@ -26,12 +26,19 @@ test('connectionGate: no client or an unanswered session read is "connecting"; a
   assert.equal(gate(true, true, true), 'online');
 });
 
-test('the UI reads the gate from the live client, the first session answer and the user', () => {
-  assert.match(html, /function gateNow\(\) \{ return connectionGate\(!!supabase, authSessionChecked, !!authUser\); \}/);
+test('the UI reads the gate from the live client, a settled session answer and the user', () => {
+  assert.match(html, /function gateNow\(\) \{ return connectionGate\(!!supabase, authSessionSettled\(\), !!authUser\); \}/);
   assert.match(html, /let authSessionChecked = false;/);
+  // owner, 2026-10-08: "signed out" waits for the account's profile and two spare seconds
+  assert.match(html, /const AUTH_SETTLE_GRACE_MS = 2000;/);
+  assert.match(html, /function authSessionSettled\(\) \{ return authSessionChecked && !authPendingUserId && Date\.now\(\) >= authSettleUntil; \}/);
   const init = sourceBetween('  function initAuth() {', '  // Profile-failure line');
-  assert.equal((init.match(/authSessionChecked = true;/g) || []).length, 2, 'answered and failed reads both end "connecting"');
+  assert.equal((init.match(/noteSessionChecked\(\);/g) || []).length, 2, 'answered and failed reads both start the settle clock');
   assert.equal((init.match(/refreshAfterSessionCheck\(\);/g) || []).length, 2);
+  const note = sourceBetween('  function noteSessionChecked() {', '  function initAuth() {');
+  assert.match(note, /authSessionChecked = true;/);
+  assert.match(note, /authSettleUntil = Date\.now\(\) \+ AUTH_SETTLE_GRACE_MS;/);
+  assert.match(note, /setTimeout\(refreshAfterSessionCheck, AUTH_SETTLE_GRACE_MS\);/);
   assert.match(html, /function refreshAfterSessionCheck\(\) \{ if \(!authUser\) \{ render\(\); refreshInviteNotices\(\); \} \}/);
 });
 

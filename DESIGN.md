@@ -502,8 +502,10 @@ placeholder חזותי. "הועתק ✓" (`.games-invite-copied`) דועך פנ�
 תתחבר לשרת". במקום זה רץ מיני משחק. spec: `docs/superpowers/specs/2026-10-08-connecting-game-design.md`.
 
 **שלושה מצבים** (`connectionGate`, טהורה; `gateNow()` מזין אותה):
-- `"connecting"`: אין `supabase`, או שקריאת ה־session הראשונה עוד לא ענתה. הדגל `authSessionChecked`
-  נקבע ב־`initAuth`, כך שגם משתמש מחובר לא רואה לרגע "יש ליצור קודם חשבון".
+- `"connecting"`: אין `supabase`, או שה־session עוד לא "התיישב" (`authSessionSettled()`). כלומר: הקריאה
+  הראשונה עוד לא ענתה, או שהפרופיל של חשבון שמור עוד נטען (`authPendingUserId`), או שעוד לא עברו
+  2 שניות מהתשובה הראשונה (`AUTH_SETTLE_GRACE_MS`). כך גם משתמש מחובר לא רואה לרגע "יש ליצור קודם
+  חשבון" (בעלים, 2026-10-08: בטלפון הפרופיל נטען כ־2 שניות אחרי ה־session).
 - `"signedOut"`: השרת ענה ואין משתמש. מוצג `ACCOUNT_NOTE`.
 - `"online"`: יש משתמש. זהה ל־`cloudMode()`.
 

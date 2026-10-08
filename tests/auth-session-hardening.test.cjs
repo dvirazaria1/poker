@@ -153,3 +153,31 @@ test('initAuth marks the first session read as answered, so "connecting" can end
   await new Promise(r => setImmediate(r));
   assert.equal(env.get('authSessionChecked'), true);
 });
+
+test('a session whose profile is still loading reads as connecting, not signed out (owner, 2026-10-08)', async () => {
+  const gate = deferred();
+  const env = makeEnv({ read: () => gate.promise });
+  env.get('authSessionChecked = true, authSettleUntil = 0');
+  const pending = env.get('applySession')(sessionOf('A'));
+  assert.equal(env.get('authPendingUserId'), 'A');
+  assert.equal(env.get('authSessionSettled()'), false, 'the profile is on its way: still connecting');
+  gate.resolve({ data: { display_name: 'A' }, error: null });
+  await pending;
+  assert.equal(env.get('authUser').id, 'A');
+  assert.equal(env.get('authSessionSettled()'), true);
+});
+
+test('with no session, "signed out" waits two spare seconds after the first answer', async () => {
+  const env = makeEnv();
+  env.get('initAuth')();
+  await new Promise(r => setImmediate(r));
+  assert.equal(env.get('authSessionChecked'), true);
+  assert.equal(env.get('authSessionSettled()'), false, 'inside the grace window');
+  env.get('authSettleUntil = Date.now() - 1');
+  assert.equal(env.get('authSessionSettled()'), true);
+});
+
+test('a failed profile load re-renders, so the screens leave "connecting"', () => {
+  const failed = authSource.slice(authSource.indexOf('if (!profile) {'), authSource.indexOf('authProfileFailedUserId = null;\n    authAppliedUserId = user.id;'));
+  assert.match(failed, /renderAuthProfileState\(\);\n      render\(\);/);
+});
