@@ -250,11 +250,12 @@ test('with data: title, incoming requests, the heading with both add actions, th
   const list = sourceBetween('  function renderFriendsList(sec, data, gate, enter)', '  function renderFriendsPage()');
   const steps = [
     'el("h2", "friends-title", "החברים שלך")',
-    'renderFriendRows(sec, data.incoming.map(f => f.requester), "incoming"',
+    'renderFriendRows(incomingList, data.incoming.map(f => f.requester), "incoming"',
     'makeFriendSearchBtn("friends-icon-btn", online, "")',
     'makeFriendInviteBtn("friends-invite-link", true, online)',
-    'renderFriendRows(sec, data.friends, "friend", "", null, enter)',
-    'renderFriendRows(sec, data.outgoing.map(f => f.addressee), "outgoing", "ממתין לאישור"',
+    'renderFriendRows(list, data.friends, "friend", "", null, enter)',
+    'renderFriendRows(list, data.outgoing.map(f => f.addressee), "outgoing", "ממתין לאישור"',
+    'renderFriendGhosts(list, data.friends.length + data.outgoing.length, enter)',
   ].map(s => list.indexOf(s));
   steps.forEach((idx, i) => assert.ok(idx >= 0, `missing step ${i}`));
   for (let i = 1; i < steps.length; i++) assert.ok(steps[i] > steps[i - 1], `step ${i} out of order`);
@@ -265,4 +266,16 @@ test('with data: title, incoming requests, the heading with both add actions, th
 
 test('the redesign is presentation only -- no localStorage access on the friends screen', () => {
   assert.doesNotMatch(friendsScreenSource, /localStorage\./);
+});
+
+test('every friend is its own card; a short list is topped up to five with fading ghost cards', () => {
+  assert.match(html, /\.friends-list \{ display: flex; flex-direction: column; gap: 8px; \}/);
+  assert.match(html, /\.friend-row \{[^}]*border: 1px solid var\(--line\); border-radius: 16px;/);
+  assert.match(html, /\.friend-row\.is-incoming \{ border-color: var\(--accent\); \}/);
+  assert.match(html, /\.friend-ghost \{[^}]*border: 1px dashed var\(--line\); border-radius: 16px;/);
+  const ghosts = sourceBetween('  function renderFriendGhosts(parent, shown, enter) {', '  // The inline add-friend panel');
+  assert.match(html, /const FRIEND_GHOST_TARGET = 5;/);
+  assert.match(ghosts, /const ghosts = FRIEND_GHOST_TARGET - shown;/);
+  assert.match(ghosts, /ghost\.setAttribute\("aria-hidden", "true"\);/);
+  assert.match(ghosts, /ghost\.style\.opacity = String\(\+\(0\.5 \* \(1 - j \/ ghosts\)\)\.toFixed\(2\)\);/);
 });

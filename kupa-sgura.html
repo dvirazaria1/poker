@@ -933,7 +933,20 @@
   .friends-search-link svg { width: 15px; height: 15px; }
   .friends-icon-btn:disabled, .friends-invite-link:disabled, .friends-search-link:disabled { color: var(--faint); cursor: default; }
   .friends-note { margin: 4px 0 0; color: var(--dim); font-size: 12px; font-weight: 300; text-align: center; animation: fadeIn .25s ease; }
-  .friend-row { display: flex; align-items: center; gap: 12px; min-height: 50px; padding: 8px 0; }
+  /* 2026-10-08 (owner): every friend is its own card, like the group cards on the games screen; a
+     short list is topped up to five with ghost cards that fade out (renderFriendGhosts). */
+  .friends-list { display: flex; flex-direction: column; gap: 8px; }
+  .friend-row {
+    display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 12px; box-sizing: border-box;
+    border: 1px solid var(--line); border-radius: 16px;
+  }
+  .friend-row.is-incoming { border-color: var(--accent); }
+  .friend-ghost {
+    display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 12px; box-sizing: border-box;
+    border: 1px dashed var(--line); border-radius: 16px;
+  }
+  .friend-ghost-ring { width: 34px; height: 34px; flex: 0 0 auto; box-sizing: border-box; border-radius: 50%; border: 1px dashed var(--avatar-ring); }
+  .friend-ghost-bar { height: 9px; border-radius: 999px; background: var(--avatar-soft); }
   .friend-name { flex: 1 1 auto; min-width: 0; color: var(--text); font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
   .friend-meta { display: block; color: var(--dim); font-size: 12px; font-weight: 300; }
   .friend-row.is-outgoing .friend-name { color: var(--dim); }
@@ -10702,6 +10715,23 @@
     });
   }
 
+  // A short list is topped up to five with ghost cards that fade out (owner, 2026-10-08): the screen
+  // never looks bare, and it hints there is room for more. Decorative only, so aria-hidden.
+  const FRIEND_GHOST_TARGET = 5;
+  function renderFriendGhosts(parent, shown, enter) {
+    const ghosts = FRIEND_GHOST_TARGET - shown;
+    for (let j = 0; j < ghosts; j++) {
+      const ghost = el("div", "friend-ghost" + (enter ? " anim" : ""));
+      ghost.setAttribute("aria-hidden", "true");
+      ghost.style.opacity = String(+(0.5 * (1 - j / ghosts)).toFixed(2));
+      if (enter) ghost.style.animationDelay = ((shown + j) * 45) + "ms";
+      const bar = el("span", "friend-ghost-bar");
+      bar.style.width = [42, 30, 38, 26, 34][j] + "%";
+      ghost.append(el("span", "friend-ghost-ring"), bar);
+      parent.appendChild(ghost);
+    }
+  }
+
   // The inline add-friend panel: same grid-collapse shape as the create-group panel.
   function renderAddFriendPanel(parent) {
     const panel = el("div", "games-create-panel");
@@ -10820,13 +10850,15 @@
       const label = el("div", "friends-label-row");
       label.appendChild(el("h3", "friends-label", count === 1 ? "בקשה חדשה" : count + " בקשות חדשות"));
       sec.appendChild(label);
-      renderFriendRows(sec, data.incoming.map(f => f.requester), "incoming", "", online ? (i => {
+      const incomingList = el("div", "friends-list");
+      renderFriendRows(incomingList, data.incoming.map(f => f.requester), "incoming", "", online ? (i => {
         const id = data.incoming[i].id;
         return [
           { label: "אשר", primary: true, onClick: () => respondToFriend(id, true) },
           { label: "דחה", onClick: () => respondToFriend(id, false) },
         ];
       }) : null, enter);
+      sec.appendChild(incomingList);
     }
     const n = data.friends.length;
     const heading = el("div", "friends-label-row");
@@ -10838,11 +10870,14 @@
     if (online) renderAddFriendPanel(sec);
     renderConnectingSlot(sec, "friends-list", "mini", gate);
     if (gate === "signedOut") sec.appendChild(el("p", "friends-note", ACCOUNT_NOTE));
-    renderFriendRows(sec, data.friends, "friend", "", null, enter);
-    renderFriendRows(sec, data.outgoing.map(f => f.addressee), "outgoing", "ממתין לאישור", online ? (i => {
+    const list = el("div", "friends-list");
+    renderFriendRows(list, data.friends, "friend", "", null, enter);
+    renderFriendRows(list, data.outgoing.map(f => f.addressee), "outgoing", "ממתין לאישור", online ? (i => {
       const id = data.outgoing[i].id;
       return [{ label: "בטל", onClick: () => withdrawFriendRequest(id) }];
     }) : null, enter);
+    renderFriendGhosts(list, data.friends.length + data.outgoing.length, enter);
+    sec.appendChild(list);
     ensureAvatars(data.friends.concat(data.incoming.map(f => f.requester), data.outgoing.map(f => f.addressee))
       .map(ref => ref && ref.userId));
   }

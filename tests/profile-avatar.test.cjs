@@ -134,7 +134,7 @@ test('the friends lists lead every row with an avatar; settings and the profile 
   const rows = between('  function renderFriendRows(', '  // The inline add-friend panel');
   assert.match(rows, /row\.appendChild\(renderAvatarEl\(cachedAvatar\(ref\.userId\), 34, ref\.displayName \|\| "", ref\.userId \|\| ""\)\);/);
   const page = between('  function renderFriendsList(', '  function renderProfile() {');
-  assert.equal((page.match(/renderFriendRows\(sec, /g) || []).length, 3, 'incoming, friends and outgoing all render through renderFriendRows');
+  assert.equal((page.match(/renderFriendRows\((incomingList|list), /g) || []).length, 3, 'incoming, friends and outgoing all render through renderFriendRows');
   assert.match(page, /ensureAvatars\(/);
 
   assert.match(html, /<button type="button" class="pavatar-edit" id="setAvatar" aria-label="עריכת תמונת הפרופיל"><\/button>/);
