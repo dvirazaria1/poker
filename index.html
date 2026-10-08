@@ -200,7 +200,7 @@
      ever change the bar's WIDTH. */
   .tabbar-in {
     display: flex; align-items: center; justify-content: space-between; gap: 4px;
-    width: 100%; height: 52px; /* owner, 2026-10-08: a thicker bar (was 44px) */
+    width: 100%; height: 49px; /* owner, 2026-10-08: a thicker bar (was 44px) */
   }
   .tab {
     flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -1644,7 +1644,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 123</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 124</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -2028,7 +2028,7 @@
     if (isGameOpen(gameState) && gameState.phase === "active") return "game";
     if (isGameOpen(gameState) && gameState.phase === "settlement") return "settle";
     if (open.length === 1) return "games";
-    return "profile";
+    return "games"; // owner, 2026-10-08: the app opens on Games (it used to open on Profile)
   }
 
   function profileDebtIds(debts, userName) {

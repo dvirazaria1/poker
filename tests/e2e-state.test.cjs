@@ -388,15 +388,15 @@ test('Scenario B: an ungrouped game (groupId null) settles the same way and neve
 
 // ---------- Scenario C/D: initial view routing follows the persisted phase ----------
 
-test('Scenario C/D: initialAppView routes open games to their phase and otherwise opens profile', () => {
+test('Scenario C/D: initialAppView routes open games to their phase and otherwise opens games', () => {
   const source = sourceBetween('  function normalizePhase', '  function normalizeDebt');
   const openGameSource = sourceBetween('  function hasOpenPhase(currentGame) {', '  // Round 2 (docs/superpowers/plans/2026-10-05-multi-game-round2.md): a device can hold several');
   const context = vm.createContext({});
   vm.runInContext(openGameSource + source, context);
   assert.equal(vm.runInContext(`initialAppView({ phase: 'active', example: false, players: [{}] })`, context), 'game');
   assert.equal(vm.runInContext(`initialAppView({ phase: 'settlement', example: false, players: [{}] })`, context), 'settle');
-  assert.equal(vm.runInContext(`initialAppView({ phase: 'active', example: false, players: [] })`, context), 'profile');
-  assert.equal(vm.runInContext(`initialAppView({ phase: 'closed', example: false, players: [] })`, context), 'profile');
+  assert.equal(vm.runInContext(`initialAppView({ phase: 'active', example: false, players: [] })`, context), 'games');
+  assert.equal(vm.runInContext(`initialAppView({ phase: 'closed', example: false, players: [] })`, context), 'games');
 });
 
 test('adding a player never opens a rebuy picker as an implicit side effect', () => {

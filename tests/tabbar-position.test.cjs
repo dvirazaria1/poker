@@ -68,7 +68,7 @@ test('the tabbar <nav>\'s .load-in entrance class is set once in the static mark
 
 test('the bar\'s height stays pinned (the earlier fix) and .kb-open still slides it fully off-screen while an input is focused', () => {
   const inBody = ruleBody('  .tabbar-in {');
-  assert.match(inBody, /height:\s*52px/);
+  assert.match(inBody, /height:\s*49px/);
   const tabBody = ruleBody('  .tab {');
   assert.match(tabBody, /height:\s*100%/);
   const kbOpenIdx = html.indexOf('.tabbar.kb-open {');

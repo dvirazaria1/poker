@@ -31,10 +31,10 @@ test('initial app view follows the persisted phase and does not open an empty ta
   const source = sourceBetween('  function initialAppView', '  function normalizeDebt');
   const context = vm.createContext({});
   vm.runInContext(openGameSource + source, context);
-  assert.equal(vm.runInContext(`initialAppView({phase:'active', example:false, players:[]})`, context), 'profile');
+  assert.equal(vm.runInContext(`initialAppView({phase:'active', example:false, players:[]})`, context), 'games');
   assert.equal(vm.runInContext(`initialAppView({phase:'settlement', example:false, players:[{}]})`, context), 'settle');
-  assert.equal(vm.runInContext(`initialAppView({phase:'closed', example:false, players:[]})`, context), 'profile');
-  assert.equal(vm.runInContext(`initialAppView({phase:'active', example:true, players:[{}]})`, context), 'profile');
+  assert.equal(vm.runInContext(`initialAppView({phase:'closed', example:false, players:[]})`, context), 'games');
+  assert.equal(vm.runInContext(`initialAppView({phase:'active', example:true, players:[{}]})`, context), 'games');
 });
 
 test('the persisted state carries an explicit phase', () => {

@@ -47,7 +47,7 @@ test("boot resumes into the one open table, or the dashboard when there are seve
   assert.equal(ctx.initialAppView(ctx.syncCurrentGameMirror({ gameId: "a", games: [slot("a", null)] })), "game");
   assert.equal(ctx.initialAppView(ctx.syncCurrentGameMirror({ gameId: "a", games: [slot("a", null), slot("b", "g")] })), "games");
   assert.equal(ctx.initialAppView(ctx.syncCurrentGameMirror({ gameId: "x", games: [slot("b", "g")] })), "games");
-  assert.equal(ctx.initialAppView(ctx.syncCurrentGameMirror({ gameId: "x", games: [] })), "profile");
+  assert.equal(ctx.initialAppView(ctx.syncCurrentGameMirror({ gameId: "x", games: [] })), "games");
 });
 
 test("the pull keeps every server table, keeps unsynced local ones, drops tables closed or deleted on the server", () => {
