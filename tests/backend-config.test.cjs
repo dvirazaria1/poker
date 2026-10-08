@@ -95,7 +95,9 @@ test('the login screen offers Google, a divider, and an email code, plus the loc
   // "כניסה" replaced "מי אתה?" — see docs/superpowers/plans/2026-09-08-design-round-2-handoff.md
   // משימה 5 (gender-neutral heading, decided by the owner) — assert the new title exactly, and
   // that the old gendered phrasing is gone rather than merely absent from this one string.
-  assert.ok(login.includes('<h2>כניסה</h2>'), 'the new gender-neutral title is used');
+  // 2026-10-08 (owner): the app's name over the dealer replaced "כניסה" -- still gender-neutral.
+  assert.ok(login.includes('<h2>סוגרים קופה</h2>'), 'the sign-in title is the app name');
+  assert.ok(login.includes('id="authLocalOpen"'), 'the no-account route opens behind one dashed button');
   assert.doesNotMatch(login, /מי אתה\?/, 'the old gendered title must not remain');
   assert.ok(login.includes('המשך עם Google'), 'Google sign-in button');
   assert.ok(login.includes('שלחו לי קוד'), 'email OTP button');
