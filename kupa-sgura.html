@@ -1749,7 +1749,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 130</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 131</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -7933,7 +7933,7 @@
     // Nothing to list yet: an onboarding heading over the dealer instead of "השולחנות שלך".
     const empty = !activeSummaries.length && !groupSummaries.length;
     inner.appendChild(el("h2", "games-home-title", empty ? "אול־אין על הערב הבא" : "השולחנות שלך"));
-    inner.appendChild(el("p", "games-home-lead", empty ? "צור קבוצה, צרף את החבר'ה, ואת כל השאר תשאיר לנו." : "המשחקים הפעילים והקבוצות שלך במקום אחד."));
+    inner.appendChild(el("p", "games-home-lead", empty ? "צור קבוצה, צרף את החבר'ה, ואנחנו נדאג לכל השאר." : "המשחקים הפעילים והקבוצות שלך במקום אחד."));
     if (empty) renderGamesEmptyHero(inner); else ghStop();
     renderActiveGamesSection(inner, activeSummaries, enterStagger);
     renderGroupsSection(inner, groupSummaries, enterStagger);

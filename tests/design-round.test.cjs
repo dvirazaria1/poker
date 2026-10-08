@@ -439,7 +439,7 @@ test('renderGamesDashboard opens with a title like the friends page, then the le
   const source = sourceBetween('  function renderGamesDashboard() {', '  function renderGroupHeader(');
   assert.match(source, /el\("div", "games-home-in games-home-dash"\)/);
   // 2026-10-08: with nothing to list, an onboarding heading ("אול־אין על הערב הבא") over the dealer.
-  assert.match(source, /const empty = !activeSummaries\.length && !groupSummaries\.length;\s*inner\.appendChild\(el\("h2", "games-home-title", empty \? "אול־אין על הערב הבא" : "השולחנות שלך"\)\);\s*inner\.appendChild\(el\("p", "games-home-lead", empty \? "צור קבוצה, צרף את החבר'ה, ואת כל השאר תשאיר לנו\." : "המשחקים הפעילים והקבוצות שלך במקום אחד\."\)\);/);
+  assert.match(source, /const empty = !activeSummaries\.length && !groupSummaries\.length;\s*inner\.appendChild\(el\("h2", "games-home-title", empty \? "אול־אין על הערב הבא" : "השולחנות שלך"\)\);\s*inner\.appendChild\(el\("p", "games-home-lead", empty \? "צור קבוצה, צרף את החבר'ה, ואנחנו נדאג לכל השאר\." : "המשחקים הפעילים והקבוצות שלך במקום אחד\."\)\);/);
   assert.match(source, /if \(empty\) renderGamesEmptyHero\(inner\); else ghStop\(\);\s*renderActiveGamesSection\(/);
   // 2026-10-08: "משחק ללא קבוצה" is a dashed card that closes the group list.
   assert.match(source, /renderGroupsSection\([^;]*;\s*renderQuickActions\(inner\);/);
