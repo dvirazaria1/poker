@@ -449,10 +449,12 @@
      so the lead line and the quick actions never sit beside the gear. */
   .games-home-dash { padding-top: 4px; }
   /* Same weight and size as the friends page's hero title, so the two tabs open the same way. */
-  .games-home-title { margin: 0 0 6px; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; text-align: center; }
-  /* margin-top 12px: with the suits row gone the title sits beside the corner stack, and the lead
-     (wide enough to reach under the settings label) has to start below the stack's 92px bottom. */
-  .games-home-lead { color: var(--dim); font-size: 14px; font-weight: 300; margin: 12px 0 26px; }
+  /* Owner, 2026-10-08: titles 10% larger (20px -> 22px) and 10px higher -- the same on Friends. */
+  .games-home-title { margin: -10px 0 6px; font-size: 22px; font-weight: 800; letter-spacing: -0.01em; text-align: center; }
+  /* margin-top 19px: the title sits beside the corner stack, and the one-line lead (wide enough to
+     reach under the settings label) has to start below the stack's 92px bottom. The title went
+     10px up and 10% larger (owner); the lead stayed where it was. */
+  .games-home-lead { color: var(--dim); font-size: 14px; font-weight: 300; margin: 19px 0 26px; }
   .games-section { margin-top: 24px; text-align: center; }
   .games-section:first-of-type { margin-top: 0; }
   .games-groups-heading { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
@@ -929,9 +931,11 @@
      lead line like "השולחנות שלך", then quiet rows -- a 34px avatar ring and a name, no dividers,
      no card. Turquoise marks only what can be acted on: a request waiting on me, "+ הזמן", "אשר".
      No section animation here: the view's .load-in plays on entry, and rows stagger only then. */
-  .friends-sec { width: 100%; max-width: 380px; margin: 24px auto 0; text-align: start; }
+  /* margin-top 14px (was 24px) and the 22px title: the owner's "titles 10% larger, 10px higher",
+     matching .games-home-title so both tabs still open alike. */
+  .friends-sec { width: 100%; max-width: 380px; margin: 14px auto 0; text-align: start; }
   .friends-head { text-align: center; margin-bottom: 6px; }
-  .friends-title { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
+  .friends-title { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
   .friends-lead { margin: 6px 0 0; color: var(--dim); font-size: 14px; font-weight: 300; }
   .friends-label-row { display: flex; align-items: center; gap: 2px; min-height: 44px; margin-top: 14px; }
   .friends-label { flex: 1 1 auto; margin: 0; color: var(--dim); font-size: 13px; font-weight: 400; }
@@ -1785,7 +1789,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 138</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 139</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -7998,7 +8002,10 @@
     // Nothing to list yet: an onboarding heading over the dealer instead of "השולחנות שלך".
     const empty = !activeSummaries.length && !groupSummaries.length;
     inner.appendChild(el("h2", "games-home-title", empty ? "אול־אין על הערב הבא" : "השולחנות שלך"));
-    inner.appendChild(el("p", "games-home-lead", empty ? "צור קבוצה, צרף את החבר'ה, ואנחנו נדאג לכל השאר." : "המשחקים הפעילים והקבוצות שלך במקום אחד."));
+    const lead = el("p", "games-home-lead");
+    if (empty) lead.append("צור קבוצה, צרף את החבר'ה.", el("br"), "אנחנו נדאג לכל השאר."); // owner: two lines
+    else lead.textContent = "המשחקים הפעילים והקבוצות שלך במקום אחד.";
+    inner.appendChild(lead);
     if (empty) renderGamesEmptyHero(inner); else ghStop();
     renderActiveGamesSection(inner, activeSummaries, enterStagger);
     renderGroupsSection(inner, groupSummaries, enterStagger);

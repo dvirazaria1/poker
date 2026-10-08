@@ -440,13 +440,14 @@ test('renderGamesDashboard opens with a title like the friends page, then the le
   assert.match(source, /el\("div", "games-home-in games-home-dash"\)/);
   // 2026-10-08: with nothing to list, an onboarding heading ("אול־אין על הערב הבא") over the dealer.
   // The one place "ערב" stays by the owner's choice; everywhere else the UI says "משחק".
-  assert.match(source, /const empty = !activeSummaries\.length && !groupSummaries\.length;\s*inner\.appendChild\(el\("h2", "games-home-title", empty \? "אול־אין על הערב הבא" : "השולחנות שלך"\)\);\s*inner\.appendChild\(el\("p", "games-home-lead", empty \? "צור קבוצה, צרף את החבר'ה, ואנחנו נדאג לכל השאר\." : "המשחקים הפעילים והקבוצות שלך במקום אחד\."\)\);/);
+  assert.match(source, /const empty = !activeSummaries\.length && !groupSummaries\.length;\s*inner\.appendChild\(el\("h2", "games-home-title", empty \? "אול־אין על הערב הבא" : "השולחנות שלך"\)\);\s*const lead = el\("p", "games-home-lead"\);\s*if \(empty\) lead\.append\("צור קבוצה, צרף את החבר'ה\.", el\("br"\), "אנחנו נדאג לכל השאר\."\);[^\n]*\s*else lead\.textContent = "המשחקים הפעילים והקבוצות שלך במקום אחד\.";\s*inner\.appendChild\(lead\);/);
   assert.match(source, /if \(empty\) renderGamesEmptyHero\(inner\); else ghStop\(\);\s*renderActiveGamesSection\(/);
   // 2026-10-08: "משחק ללא קבוצה" is a dashed card that closes the group list.
   assert.match(source, /renderGroupsSection\([^;]*;\s*renderQuickActions\(inner\);/);
-  assert.match(html, /\.games-home-title \{[^}]*font-size: 20px; font-weight: 800;/);
+  assert.match(html, /\.games-home-title \{ margin: -10px 0 6px; font-size: 22px; font-weight: 800;/);
+  assert.match(html, /\.friends-title \{[^}]*font-size: 22px; font-weight: 800;/);
   assert.match(html, /\.games-home-dash \{ padding-top: 4px; \}/);
-  assert.match(html, /\.games-home-lead \{[^}]*margin: 12px 0 26px;/);
+  assert.match(html, /\.games-home-lead \{[^}]*margin: 19px 0 26px;/);
   // the group page reuses .games-home-in but not the dashboard padding
   const group = sourceBetween('  function renderGroupPage() {', '  function renderAddRowChips() {');
   assert.match(group, /el\("div", "games-home-in"\)/);
