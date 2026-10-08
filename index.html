@@ -1261,6 +1261,24 @@
   .btn-quiet:hover { border-color: var(--dim); color: var(--text); }
   .btn-quiet:active { transform: scale(.97); }
   .login-benefit { margin-top: -10px !important; }
+  /* Sign-in, owner's pick 2026-10-08 ("הדילר מקבל אותך"): the empty Games dealer above a centred
+     "סוגרים קופה"; full-width actions; the no-account route folded into one dashed button that
+     opens the name form. The column scrolls from the top -- it is taller than a short phone. */
+  #login { align-items: flex-start; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding-block: calc(36px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); }
+  #login .login-in { margin-inline: auto; gap: 16px; }
+  .login-hero .gh-stage { margin: 0 auto; }
+  .login-head { text-align: center; margin-top: -6px; }
+  #login .login-head h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; }
+  #login .login-head .login-benefit { margin: 8px 0 0 !important; line-height: 1.5; }
+  #login .btn-primary, #login .btn-quiet { align-self: stretch; }
+  .login-local-open {
+    width: 100%; min-height: 52px; border: 1.5px dashed var(--faint); border-radius: 16px;
+    color: var(--dim); font-size: 15px; font-weight: 700; transition: border-color .2s, color .2s;
+  }
+  .login-local-open:hover { border-color: var(--dim); color: var(--text); }
+  .auth-local.auth-local-in { animation: rise .28s ease both; }
+  #login .login-legal, #login .auth-local p { text-align: center; }
   .login-legal { color: var(--faint); font-size: 11px; line-height: 1.5; margin: -2px 0 0; }
   .login-legal:empty { display: none; }
   /* The terms and privacy links carry the legal weight of this line: enforceability of a
@@ -1802,7 +1820,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 146</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 147</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -1844,8 +1862,11 @@
 
   <div class="login" id="login" hidden>
   <div class="login-in">
-    <h2>כניסה</h2>
-    <p class="login-benefit">חשבון שומר את החובות והקבוצות שלך בין משחקים ובין מכשירים. בלי סיסמה.</p>
+    <div class="login-hero" aria-hidden="true"><div class="gh-stage" id="loginStage"></div></div>
+    <div class="login-head">
+      <h2>סוגרים קופה</h2>
+      <p class="login-benefit">כל משחק, כל קבוצה וכל חוב, במקום אחד.<br>נכנסים בלי סיסמה.</p>
+    </div>
     <p class="join-notice-status" id="loginNote" hidden></p>
     <div class="auth-block" id="authBlock" hidden>
       <button type="button" class="btn-google" id="authGoogleBtn">
@@ -1882,6 +1903,7 @@
       </div>
     </div>
     <p class="auth-note" id="authOffline" hidden>כניסה עם חשבון לא זמינה כרגע</p>
+    <button type="button" class="login-local-open" id="authLocalOpen" aria-expanded="false" aria-controls="authLocal">המשך בלי חשבון</button>
     <div class="auth-local" id="authLocal">
       <p class="auth-local-title">בלי חשבון</p>
       <p>איך קוראים לך? השם נשאר על המכשיר הזה, בלי סנכרון בין מכשירים.</p>
@@ -1889,7 +1911,7 @@
       <div class="who-row" id="loginChips"></div>
       <input type="text" id="loginName" placeholder="השם שלך" autocomplete="off" aria-label="השם שלך">
       <button type="button" class="btn-primary" id="loginGo">המשך</button>
-      <button type="button" class="btn-quiet" id="loginSkip">המשך בלי חשבון</button>
+      <button type="button" class="btn-quiet" id="loginSkip">המשך בלי שם</button>
     </div>
     <!-- LOGIN_LEGAL_NOTE / LOGIN_AGE_NOTE: placeholder copy, filled in by JS at showLogin() time.
          Final text is being drafted separately in docs/legal-copy.md — swapping the two JS string
@@ -10382,7 +10404,16 @@
     document.getElementById("authBlock").hidden = !supabase;
     document.getElementById("authOffline").hidden = !!supabase;
     document.getElementById("authLocal").classList.toggle("auth-local-only", !supabase);
+    // With an account route on offer the name form waits behind "המשך בלי חשבון"; without one it
+    // is the only route, so it shows straight away.
+    const localOpen = !supabase || loginLocalOpen;
+    document.getElementById("authLocal").hidden = !localOpen;
+    const opener = document.getElementById("authLocalOpen");
+    opener.hidden = localOpen;
+    opener.setAttribute("aria-expanded", localOpen ? "true" : "false");
   }
+  let loginLocalOpen = false;
+  let loginHero = null;
 
   async function signInWithGoogle() {
     if (!supabase) return;
@@ -10522,7 +10553,15 @@
   function showLogin() {
     const box = document.getElementById("login");
     box.hidden = false;
+    loginLocalOpen = false;
     refreshAuthBlock();
+    // The empty Games dealer, dealing here too; ghStart pauses itself while the overlay is hidden.
+    if (!loginHero) loginHero = { stage: document.getElementById("loginStage"), gen: 0, running: false };
+    if (!loginHero.running) {
+      loginHero.running = true;
+      const hero = loginHero;
+      afterNextFrame(() => ghStart(hero));
+    }
     setAuthStep(authEmailPending ? "code" : "email");
     setAuthError("authGoogleError", authRedirectError);
     authRedirectError = ""; // shown once — a later visit to this screen starts clean
@@ -10564,6 +10603,13 @@
   document.getElementById("loginGo").addEventListener("click", confirmLogin);
   document.getElementById("loginName").addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); confirmLogin(); }
+  });
+  document.getElementById("authLocalOpen").addEventListener("click", () => {
+    loginLocalOpen = true;
+    refreshAuthBlock();
+    const local = document.getElementById("authLocal");
+    local.classList.remove("auth-local-in"); void local.offsetWidth; local.classList.add("auth-local-in");
+    document.getElementById("loginName").focus();
   });
   document.getElementById("loginSkip").addEventListener("click", () => {
     document.getElementById("login").hidden = true;
