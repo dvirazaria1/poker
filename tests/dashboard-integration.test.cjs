@@ -64,14 +64,16 @@ test('the group card opens in place: no "הרחב" toggle button, its body comes
   assert.match(groupCardSource, /if \(actions\.onToggle\) card\.appendChild\(renderGroupCardBody\(group, expanded\)\);/);
 });
 
-test('the open group card: table, invite and details tiles, settings in the corner, then the members with games played', () => {
+test('the open group card: a big table button, a "סטטיסטיקות" tile, then "צרף חבר" as the first member row', () => {
   const main = sourceBetween('  function renderGroupCardMain(content, group) {', '  // Details mode:');
-  assert.match(main, /label: "פתח שולחן", primary: true, onClick: \(\) => \{ currentGroupId = groupId; toggleStartGamePanel\(\); \}/);
-  assert.match(main, /\{ icon: "invite", label: "צרף חבר", onClick: \(\) => shareGroupInvite\(group\) \}/);
-  assert.match(main, /\{ icon: "details", label: "פירוט", onClick: \(\) => setGroupCardMode\("details", "games"\) \}/);
-  assert.doesNotMatch(main, /"הגדרות"/);
-  assert.match(main, /formatGamesPlayedCount\(count\)/);
-  assert.ok(main.indexOf('groupTileRow(') < main.indexOf('"games-group-players"'), 'tiles sit above the member list');
+  assert.match(main, /onTable = \(\) => \{ currentGroupId = groupId; toggleStartGamePanel\(\); \};/);
+  assert.match(main, /el\("button", "games-group-table-btn"\)/);
+  assert.match(main, /<span>סטטיסטיקות<\/span>/);
+  assert.match(main, /stats\.addEventListener\("click", \(\) => setGroupCardMode\("details", "games"\)\);/);
+  assert.match(main, /join\.addEventListener\("click", \(\) => shareGroupInvite\(group\)\);/);
+  assert.doesNotMatch(main, /formatGamesPlayedCount/);
+  assert.doesNotMatch(main, /"פירוט"/);
+  assert.ok(main.indexOf('"games-group-join"') < main.indexOf('members.forEach'), 'the join row comes before the members');
   assert.match(groupCardSource, /setGroupCardMode\("settings", "details"\)/);
 });
 
