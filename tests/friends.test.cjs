@@ -257,6 +257,6 @@ test('the empty-state redesign changes presentation only -- no localStorage acce
 
 test('a friends page with data has a title, skips empty groups, and lets the lists span the column', () => {
   assert.match(friendsPageSource, /el\("h2", "friends-hero-title friends-page-title", "החברים שלך"\)/);
-  assert.match(html, /function renderFriendGroup\(parent, title, refs, metaLabel, actionsFor\) \{\n    if \(!refs\.length\) return;/);
+  assert.match(html, /function renderFriendGroup\(parent, title, refs, metaLabel, actionsFor, withAvatars\) \{\n    if \(!refs\.length\) return;/);
   assert.match(html, /\.friends-page \.debt-group \{ align-self: stretch; \}/);
 });
