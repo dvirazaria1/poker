@@ -4,10 +4,12 @@ const fs = require('node:fs');
 
 const html = fs.readFileSync('kupa-sgura.html', 'utf8');
 
-test('#syncDot is pinned into the top-right corner, 40px above its old in-flow spot, with the 44px tap target kept', () => {
+test('#syncDot is pinned into the top-right corner, with the 44px tap target kept', () => {
   const dotBlock = html.match(/\.dot \{[^}]*\}/s)[0];
   assert.match(dotBlock, /position:\s*absolute/, 'the dot must be taken out of the eyebrow flow to reach the true corner');
-  assert.match(dotBlock, /top:\s*-40px/, 'owner asked for 25px, then a further 15px -- 40px total above the in-flow spot');
+  // Was -40px (owner: 25px, then a further 15px above the in-flow spot). 2026-10-08 the 48px suits
+  // row above the header left the layout, so the dot moved down by the same 48px to keep its spot.
+  assert.match(dotBlock, /top:\s*8px/, 'the same screen position as -40px had under the 48px suits row');
   assert.match(dotBlock, /inset-inline-start:\s*18px/,
     'inline-start is the right edge in this RTL page -- same edge the dot already sat on, opposite .corner-btn\'s physical left');
 

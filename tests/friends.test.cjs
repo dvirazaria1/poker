@@ -331,7 +331,11 @@ test('a friend card carries an unfriend button: an icon that arms into a red "ב
   assert.match(sql, /status = 'accepted'/);
 });
 
-test('the suits mark is set aside, not deleted: hidden, its space and artwork kept for later', () => {
+test('the suits mark is set aside, not deleted: out of the layout, its artwork kept for later', () => {
   assert.match(html, /<div class="suits-mark" aria-hidden="true">\s*<img class="suits-mark-dark" src="data:image\/png;base64,/);
-  assert.match(html, /\.suits-mark \{[^}]*visibility: hidden;/);
+  // 2026-10-08: the owner asked for the screens to move up into its 48px, so the row is gone too;
+  // the sync dot moved down by the same 48px (-40px -> 8px) to stay in the corner.
+  assert.match(html, /\.suits-mark \{ display: none; \}/);
+  assert.match(html, /\.dot \{[^}]*position: absolute; top: 8px;/);
+  assert.match(html, /\.table-header \{[^}]*margin-top: 20px;/);
 });
