@@ -446,7 +446,7 @@ test('renderGamesDashboard opens with a title like the friends page, then the le
   assert.match(source, /renderGroupsSection\([^;]*;\s*renderQuickActions\(inner\);/);
   assert.match(html, /\.games-home-title \{[^}]*font-size: 20px; font-weight: 800;/);
   assert.match(html, /\.games-home-dash \{ padding-top: 4px; \}/);
-  assert.match(html, /\.games-home-lead \{[^}]*margin: 0 0 26px;/);
+  assert.match(html, /\.games-home-lead \{[^}]*margin: 12px 0 26px;/);
   // the group page reuses .games-home-in but not the dashboard padding
   const group = sourceBetween('  function renderGroupPage() {', '  function renderAddRowChips() {');
   assert.match(group, /el\("div", "games-home-in"\)/);

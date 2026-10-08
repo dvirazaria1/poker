@@ -436,7 +436,9 @@
   .games-home-dash { padding-top: 4px; }
   /* Same weight and size as the friends page's hero title, so the two tabs open the same way. */
   .games-home-title { margin: 0 0 6px; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; text-align: center; }
-  .games-home-lead { color: var(--dim); font-size: 14px; font-weight: 300; margin: 0 0 26px; }
+  /* margin-top 12px: with the suits row gone the title sits beside the corner stack, and the lead
+     (wide enough to reach under the settings label) has to start below the stack's 92px bottom. */
+  .games-home-lead { color: var(--dim); font-size: 14px; font-weight: 300; margin: 12px 0 26px; }
   .games-section { margin-top: 24px; text-align: center; }
   .games-section:first-of-type { margin-top: 0; }
   .games-groups-heading { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
@@ -1763,7 +1765,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 136</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 137</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
