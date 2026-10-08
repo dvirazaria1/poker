@@ -584,6 +584,12 @@
   .games-group-action.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
   .games-group-gear { width: 34px; height: 34px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; color: var(--dim); border-radius: 50%; transition: color .2s; }
   .games-group-gear.on { color: var(--accent); }
+  /* The gear arrives with the open card: grows from nothing with a quarter turn, and leaves the
+     same way when the card closes. */
+  @keyframes gearPopIn { from { opacity: 0; transform: scale(.3) rotate(-90deg); } to { opacity: 1; transform: none; } }
+  @keyframes gearPopOut { to { opacity: 0; transform: scale(.3) rotate(-90deg); } }
+  .games-group-gear.pop-in { animation: gearPopIn .38s cubic-bezier(.34, 1.4, .64, 1) .08s both; }
+  .games-group-gear.pop-out { animation: gearPopOut .2s ease both; }
   @keyframes gearSpinIn { from { transform: rotate(-180deg); } to { transform: none; } }
   @keyframes gearSpinOut { from { transform: rotate(180deg); } to { transform: none; } }
   .games-group-gear.spin-in svg { animation: gearSpinIn .55s cubic-bezier(.2, .8, .2, 1) both; }
@@ -7052,7 +7058,9 @@
     if (expanded && group.isMember) {
       // The gear turns as the card swaps to (or back from) settings; the new body drops in from the top.
       const spin = groupCardMotion === "settings-in" ? " spin-in" : groupCardMotion === "settings-out" ? " spin-out" : "";
-      const gear = el("button", "games-group-gear" + (expandedGroupMode === "settings" ? " on" : "") + spin);
+      // On a fresh open the gear grows in with the body (expandedGroupJustOpened is still set here:
+      // the body, rendered after this header, is what consumes it).
+      const gear = el("button", "games-group-gear" + (expandedGroupMode === "settings" ? " on" : "") + spin + (expandedGroupJustOpened ? " pop-in" : ""));
       gear.type = "button";
       gear.setAttribute("aria-label", "הגדרות קבוצה");
       gear.setAttribute("aria-pressed", String(expandedGroupMode === "settings"));
@@ -7146,6 +7154,8 @@
   }
   function collapseGroupCard() {
     const body = document.querySelector(".games-group-card.expanded .games-group-body.open");
+    const gear = document.querySelector(".games-group-card.expanded .games-group-gear");
+    if (gear) gear.classList.add("pop-out");
     const finish = () => { expandedGroupId = ""; expandedGroupMode = "main"; expandedGroupTab = ""; disarmGroupCardAction(); resetStartGamePanel(); renderGamesDashboard(); };
     if (!body) { finish(); return; }
     body.classList.remove("open");
