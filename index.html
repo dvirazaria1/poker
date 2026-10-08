@@ -72,10 +72,13 @@
     max-width: 520px; margin: 0 auto;
     padding: calc(14px + env(safe-area-inset-top, 0px)) 18px calc(110px + env(safe-area-inset-bottom, 0px));
   }
+  /* Owner, 2026-10-08: the suits mark is set aside for now -- hidden, not deleted. The markup and
+     both artworks stay in the page for a later use, and the row keeps its 48px so nothing below
+     moves up beside the corner controls. To bring it back, drop `visibility: hidden`. */
   .suits-mark {
     display: flex; align-items: center; justify-content: center;
     width: 100%; height: 40px; margin: 0 auto 8px;
-    pointer-events: none;
+    pointer-events: none; visibility: hidden;
   }
   /* Optical centring, settled by eye rather than by formula. Two measurements of "centre"
      disagree on this artwork: the bounding box is already symmetric (8px of empty canvas each
@@ -956,10 +959,10 @@
   .friend-row.is-incoming { border-color: var(--accent); }
   .friend-ghost {
     display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 12px; box-sizing: border-box;
-    border: 1px dashed var(--line); border-radius: 16px;
+    border: 1px dashed var(--faint); border-radius: 16px;
   }
-  .friend-ghost-ring { width: 34px; height: 34px; flex: 0 0 auto; box-sizing: border-box; border-radius: 50%; border: 1px dashed var(--avatar-ring); }
-  .friend-ghost-bar { height: 9px; border-radius: 999px; background: var(--avatar-soft); }
+  .friend-ghost-ring { width: 34px; height: 34px; flex: 0 0 auto; box-sizing: border-box; border-radius: 50%; border: 1px dashed var(--faint); }
+  .friend-ghost-bar { height: 9px; border-radius: 999px; background: var(--line); }
   .friend-name { flex: 1 1 auto; min-width: 0; color: var(--text); font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
   .friend-meta { display: block; color: var(--dim); font-size: 12px; font-weight: 300; }
   .friend-row.is-outgoing .friend-name { color: var(--dim); }
@@ -980,6 +983,13 @@
   .friend-action:hover { color: var(--text); }
   .friend-action.primary { color: var(--accent); font-weight: 700; }
   .friend-action.primary span { display: inline-block; border: 1px solid var(--accent); border-radius: 999px; padding: 5px 14px; }
+  /* Unfriend (owner, 2026-10-08): a quiet person-minus icon at the card's end that arms, for 4s,
+     into a red "בטל חברות" -- the same two-step as removing a group member. */
+  .friend-action.icon { width: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--faint); }
+  .friend-action.icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .friend-action.icon:hover { color: var(--bad); }
+  .friend-action.danger { color: var(--bad); font-weight: 600; animation: fadeIn .2s ease; }
+  .friend-action.danger span { display: inline-block; border: 1px solid var(--bad); border-radius: 999px; padding: 5px 14px; }
   .friend-action:active, .friends-invite-link:active, .friends-icon-btn:active, .friends-search-link:active { transform: scale(.96); }
   .friends-invite-link:disabled:active, .friends-icon-btn:disabled:active, .friends-search-link:disabled:active { transform: none; }
   .friend-error { color: var(--bad); font-size: 13px; font-weight: 500; margin: 0; text-align: center; animation: rise .25s ease both; }
@@ -1765,7 +1775,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 134</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 135</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -3867,6 +3877,24 @@
     const index = list.findIndex(f => f && f.id === id && f.status === "pending" && sameIdentity(f.requester, meRef));
     if (index < 0) return null;
     return list.splice(index, 1)[0];
+  }
+  // Ending a friendship (owner, 2026-10-08): either party may end an ACCEPTED one -- exactly what
+  // friendships_delete_party allows on the server (docs/backend/friendship-unfriend.sql). Returns
+  // the removed Friendship, or null when `id` is not an accepted friendship of mine.
+  function endFriendship(friendships, id, meRef) {
+    const list = Array.isArray(friendships) ? friendships : [];
+    const index = list.findIndex(f => f && f.id === id && f.status === "accepted" &&
+      (sameIdentity(f.requester, meRef) || sameIdentity(f.addressee, meRef)));
+    if (index < 0) return null;
+    return list.splice(index, 1)[0];
+  }
+  // The id of the accepted friendship between me and `otherRef`, or null.
+  function friendshipIdWith(friendships, meRef, otherRef) {
+    const list = Array.isArray(friendships) ? friendships : [];
+    const found = list.find(f => f && f.status === "accepted" &&
+      ((sameIdentity(f.requester, meRef) && sameIdentity(f.addressee, otherRef)) ||
+       (sameIdentity(f.addressee, meRef) && sameIdentity(f.requester, otherRef))));
+    return found ? found.id : null;
   }
   // Why a request from `fromRef` to `toRef` cannot be sent: "self" | "friends" | "pending",
   // or null when it can. createFriendRequest refuses exactly these cases too (it returns null
@@ -10706,18 +10734,43 @@
     setTimeout(finish, 280);
   }
 
-  // A row action: a full 44px target; the primary one draws its thin pill on an inner span.
-  // Shared by the friends rows and the group page's "זה אני?" rows.
+  // Ending a friendship: two steps, like removing a group member -- the first tap arms the card's
+  // icon into a red "בטל חברות" for 4s, the second ends it. One card armed at a time. The row
+  // leaves through the pure endFriendship() and the same DELETE a withdrawn request uses.
+  let unfriendArmedId = null;
+  let unfriendArmedTimeout = null;
+  const FRIEND_UNFRIEND_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"></circle><path d="M3.5 19.5a6.5 6.5 0 0 1 13 0"></path><path d="M16.5 11h5"></path></svg>';
+  function armUnfriend(id) {
+    clearTimeout(unfriendArmedTimeout);
+    unfriendArmedId = id;
+    unfriendArmedTimeout = setTimeout(() => { unfriendArmedId = null; renderFriendsPage(); }, 4000);
+    renderFriendsPage();
+  }
+  function unfriend(id) {
+    clearTimeout(unfriendArmedTimeout);
+    unfriendArmedId = null;
+    if (!cloudMode()) return;
+    const removed = endFriendship(state.friendships || [], id, myFriendRef());
+    if (!removed) return;
+    save();
+    cloudDeleteFriendship(removed.id);
+    renderFriendsPage();
+  }
+
+  // A row action: a full 44px target; the primary one draws its thin pill on an inner span, an
+  // icon action carries its own aria-label. Shared by the friends rows and the group page's
+  // "זה אני?" rows.
   function makeFriendActionBtn(action) {
-    const btn = el("button", "friend-action" + (action.primary ? " primary" : ""));
+    const btn = el("button", "friend-action" + (action.primary ? " primary" : "") + (action.danger ? " danger" : "") + (action.icon ? " icon" : ""));
     btn.type = "button";
-    btn.appendChild(el("span", "", action.label));
+    if (action.icon) { btn.innerHTML = action.icon; btn.setAttribute("aria-label", action.ariaLabel || ""); }
+    else btn.appendChild(el("span", "", action.label));
     btn.addEventListener("click", action.onClick);
     return btn;
   }
   // One friends list as quiet rows: a 34px avatar ring, the name, and (online only) the row's
   // actions. `kind` sets the ring -- "incoming" turquoise (waiting on me), "outgoing" dashed
-  // (waiting on them), "friend" plain; the accepted list passes no actions, nothing destructive.
+  // (waiting on them), "friend" plain (its one action ends the friendship, behind a two-step).
   // `enter` is true only on a fresh navigation into the screen, so opening the search panel or
   // answering a request never replays the stagger (same rule as the dashboard's enterStagger).
   function renderFriendRows(parent, refs, kind, metaLabel, actionsFor, enter) {
@@ -10741,7 +10794,7 @@
     for (let j = 0; j < ghosts; j++) {
       const ghost = el("div", "friend-ghost" + (enter ? " anim" : ""));
       ghost.setAttribute("aria-hidden", "true");
-      ghost.style.opacity = String(+(0.5 * (1 - j / ghosts)).toFixed(2));
+      ghost.style.opacity = String(+(0.75 * (1 - j / ghosts)).toFixed(2));
       if (enter) ghost.style.animationDelay = ((shown + j) * 45) + "ms";
       const bar = el("span", "friend-ghost-bar");
       bar.style.width = [42, 30, 38, 26, 34][j] + "%";
@@ -10889,7 +10942,14 @@
     renderConnectingSlot(sec, "friends-list", "mini", gate);
     if (gate === "signedOut") sec.appendChild(el("p", "friends-note", ACCOUNT_NOTE));
     const list = el("div", "friends-list");
-    renderFriendRows(list, data.friends, "friend", "", null, enter);
+    renderFriendRows(list, data.friends, "friend", "", online ? (i => {
+      const friend = data.friends[i];
+      const id = friendshipIdWith(state.friendships || [], myFriendRef(), friend);
+      if (!id) return [];
+      return [unfriendArmedId === id
+        ? { label: "בטל חברות", danger: true, onClick: () => unfriend(id) }
+        : { icon: FRIEND_UNFRIEND_ICON, ariaLabel: "בטל חברות עם " + (friend.displayName || "משתמש"), onClick: () => armUnfriend(id) }];
+    }) : null, enter);
     renderFriendRows(list, data.outgoing.map(f => f.addressee), "outgoing", "ממתין לאישור", online ? (i => {
       const id = data.outgoing[i].id;
       return [{ label: "בטל", onClick: () => withdrawFriendRequest(id) }];

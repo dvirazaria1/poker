@@ -253,7 +253,7 @@ test('with data: title, incoming requests, the heading with both add actions, th
     'renderFriendRows(incomingList, data.incoming.map(f => f.requester), "incoming"',
     'makeFriendSearchBtn("friends-icon-btn", online, "")',
     'makeFriendInviteBtn("friends-invite-link", true, online)',
-    'renderFriendRows(list, data.friends, "friend", "", null, enter)',
+    'renderFriendRows(list, data.friends, "friend", "", online ? (i =>',
     'renderFriendRows(list, data.outgoing.map(f => f.addressee), "outgoing", "ממתין לאישור"',
     'renderFriendGhosts(list, data.friends.length + data.outgoing.length, enter)',
   ].map(s => list.indexOf(s));
@@ -272,10 +272,66 @@ test('every friend is its own card; a short list is topped up to five with fadin
   assert.match(html, /\.friends-list \{ display: flex; flex-direction: column; gap: 8px; \}/);
   assert.match(html, /\.friend-row \{[^}]*border: 1px solid var\(--line\); border-radius: 16px;/);
   assert.match(html, /\.friend-row\.is-incoming \{ border-color: var\(--accent\); \}/);
-  assert.match(html, /\.friend-ghost \{[^}]*border: 1px dashed var\(--line\); border-radius: 16px;/);
+  assert.match(html, /\.friend-ghost \{[^}]*border: 1px dashed var\(--faint\); border-radius: 16px;/);
   const ghosts = sourceBetween('  function renderFriendGhosts(parent, shown, enter) {', '  // The inline add-friend panel');
   assert.match(html, /const FRIEND_GHOST_TARGET = 5;/);
   assert.match(ghosts, /const ghosts = FRIEND_GHOST_TARGET - shown;/);
   assert.match(ghosts, /ghost\.setAttribute\("aria-hidden", "true"\);/);
-  assert.match(ghosts, /ghost\.style\.opacity = String\(\+\(0\.5 \* \(1 - j \/ ghosts\)\)\.toFixed\(2\)\);/);
+  assert.match(ghosts, /ghost\.style\.opacity = String\(\+\(0\.75 \* \(1 - j \/ ghosts\)\)\.toFixed\(2\)\);/);
+});
+
+// ---------- ending a friendship (owner, 2026-10-08) ----------
+
+test('endFriendship lets either party end an accepted friendship, and nothing else', () => {
+  const context = load();
+  const J = JSON.stringify;
+  const me = { userId: 'u-me', guestId: null, displayName: 'דביר' };
+  const a = { userId: 'u-a', guestId: null, displayName: 'עומר' };
+  const b = { userId: 'u-b', guestId: null, displayName: 'נועה' };
+  vm.runInContext(`var fs = [
+    { id: 'f1', requester: ${J(me)}, addressee: ${J(a)}, status: 'accepted' },
+    { id: 'f2', requester: ${J(b)}, addressee: ${J(me)}, status: 'accepted' },
+    { id: 'f3', requester: ${J(me)}, addressee: ${J(b)}, status: 'pending' },
+    { id: 'f4', requester: ${J(a)}, addressee: ${J(b)}, status: 'accepted' }
+  ];`, context);
+  assert.equal(vm.runInContext(`endFriendship(fs, 'f3', ${J(me)})`, context), null, 'a pending request is withdrawn, not ended');
+  assert.equal(vm.runInContext(`endFriendship(fs, 'f4', ${J(me)})`, context), null, 'not my friendship');
+  assert.equal(vm.runInContext(`endFriendship(fs, 'f2', ${J(me)}).id`, context), 'f2', 'the addressee may end it too');
+  assert.equal(vm.runInContext(`endFriendship(fs, 'f1', ${J(me)}).id`, context), 'f1');
+  assert.deepEqual(runJSON(`fs.map(f => f.id)`, context), ['f3', 'f4']);
+});
+
+test('friendshipIdWith finds the accepted friendship between me and someone, in either direction', () => {
+  const context = load();
+  const J = JSON.stringify;
+  const me = { userId: 'u-me', guestId: null, displayName: 'דביר' };
+  const a = { userId: 'u-a', guestId: null, displayName: 'עומר' };
+  const b = { userId: 'u-b', guestId: null, displayName: 'נועה' };
+  vm.runInContext(`var fs = [
+    { id: 'f1', requester: ${J(a)}, addressee: ${J(me)}, status: 'accepted' },
+    { id: 'f2', requester: ${J(me)}, addressee: ${J(b)}, status: 'pending' }
+  ];`, context);
+  assert.equal(vm.runInContext(`friendshipIdWith(fs, ${J(me)}, ${J(a)})`, context), 'f1');
+  assert.equal(vm.runInContext(`friendshipIdWith(fs, ${J(me)}, ${J(b)})`, context), null);
+});
+
+test('a friend card carries an unfriend button: an icon that arms into a red "בטל חברות" for 4s', () => {
+  const list = sourceBetween('  function renderFriendsList(sec, data, gate, enter)', '  function renderFriendsPage()');
+  assert.match(list, /renderFriendRows\(list, data\.friends, "friend", "", online \? \(i => \{/);
+  assert.match(list, /\{ label: "בטל חברות", danger: true, onClick: \(\) => unfriend\(id\) \}/);
+  assert.match(list, /ariaLabel: "בטל חברות עם " \+/);
+  const un = sourceBetween('  function armUnfriend(id) {', '  // A row action:');
+  assert.match(un, /setTimeout\(\(\) => \{ unfriendArmedId = null; renderFriendsPage\(\); \}, 4000\);/);
+  assert.match(un, /if \(!cloudMode\(\)\) return;/);
+  assert.match(un, /endFriendship\(state\.friendships \|\| \[\], id, myFriendRef\(\)\)/);
+  assert.match(un, /cloudDeleteFriendship\(removed\.id\);/);
+  assert.match(html, /\.friend-action\.danger span \{[^}]*border: 1px solid var\(--bad\);/);
+  const sql = fs.readFileSync('docs/backend/friendship-unfriend.sql', 'utf8');
+  assert.match(sql, /CREATE POLICY friendships_delete_party ON friendships FOR DELETE TO authenticated/);
+  assert.match(sql, /status = 'accepted'/);
+});
+
+test('the suits mark is set aside, not deleted: hidden, its space and artwork kept for later', () => {
+  assert.match(html, /<div class="suits-mark" aria-hidden="true">\s*<img class="suits-mark-dark" src="data:image\/png;base64,/);
+  assert.match(html, /\.suits-mark \{[^}]*visibility: hidden;/);
 });
