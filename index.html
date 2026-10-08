@@ -1365,20 +1365,21 @@
   .settings-danger-title { font-size: 13px; letter-spacing: .04em; font-weight: 500; color: var(--bad); margin: 22px 0 0; }
 
   /* ---------- the settings screen: a list in groups ----------
-     Scrolls from the top like any list. Each row is a label at the start and its value or control
-     at the end, on a hairline; groups carry a quiet title; the danger zone sits last with a red
-     title. A whole .set-row-tap row is a tap target for the control inside it (wired in JS), and
-     every row tints briefly while pressed. */
-  #settings {
-    align-items: flex-start; overflow-y: auto; -webkit-overflow-scrolling: touch;
-    padding: calc(10px + env(safe-area-inset-top, 0px)) 20px calc(32px + env(safe-area-inset-bottom, 0px));
+     A page of the app like Profile or Friends (appView "settings", a section inside .wrap), reached
+     from the corner gear, which stays lit while it is open; the theme toggle and the tab bar stay
+     where they are. Each row is a label at the start and its value or control at the end, on a
+     hairline; groups carry a quiet title; the danger zone sits last with a red title. A whole
+     .set-row-tap row is a tap target for the control inside it (wired in JS), and every row tints
+     briefly while pressed. */
+  #settings .set-in {
+    max-width: 420px; margin: 0 auto; display: flex; flex-direction: column;
+    align-items: stretch; text-align: start; gap: 26px;
   }
-  #settings .set-in { max-width: 420px; margin: 0 auto; align-items: stretch; text-align: start; gap: 26px; }
   #settings .set-in input { max-width: none; text-align: start; }
-  .set-head { display: flex; align-items: center; justify-content: space-between; min-height: 48px; }
-  .set-head .back-arrow { position: static; margin-inline-start: -8px; }
-  #settings .set-title { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.3; } /* beats .login h2 (34px/900) */
-  .set-head-spacer { width: 42px; }
+  .set-head { display: flex; align-items: center; justify-content: center; min-height: 44px; }
+  #settings .set-title { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.3; }
+  .corner-btn.on { color: var(--accent); }
+  .corner-btn.on .cicon { transform: rotate(60deg); }
   .set-identity { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
   .set-identity .set-name { margin-top: 6px; }
   #settings .set-account, #settings .set-local-note { margin: 0; font-size: 13px; font-weight: 300; color: var(--dim); overflow-wrap: anywhere; }
@@ -1814,129 +1815,6 @@
 <!-- profile picture editor: content is built by openAvatarEditor() -->
 <div class="login" id="avatarEditor" role="dialog" aria-modal="true" aria-labelledby="avatarEditorTitle" hidden></div>
 
-<div class="login" id="settings" hidden>
-  <div class="login-in set-in">
-    <div class="set-head">
-      <button type="button" class="back-arrow" id="setBackBtn" aria-label="חזרה">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg>
-      </button>
-      <h2 class="set-title">הגדרות</h2>
-      <span class="set-head-spacer" aria-hidden="true"></span>
-    </div>
-
-    <div class="set-identity">
-      <button type="button" class="pavatar-edit" id="setAvatar" aria-label="עריכת תמונת הפרופיל"></button>
-      <div class="set-name" id="setName"></div>
-      <p class="set-account" id="setAccount" dir="ltr" hidden></p>
-      <p class="set-local-note" id="setLocalNote" hidden>בלי חשבון · נשמר רק במכשיר הזה</p>
-    </div>
-
-    <div class="set-signin" id="setSignIn" hidden>
-      <p class="games-primary-reason" id="setSignInNote" hidden>עם חשבון המשחקים והחובות נשמרים גם בשרת, וחברים יכולים להזמין אותך לקבוצה.</p>
-      <button type="button" class="btn-primary btn-fill set-signin-btn" id="setSignInBtn" hidden>התחברות עם חשבון</button>
-    </div>
-    <div class="set-profile-fail" id="setProfileFail" hidden>
-      <p class="games-primary-reason">ההתחברות הצליחה אבל לא הצלחנו לטעון את החשבון.</p>
-      <button type="button" class="set-flat" id="setProfileRetryBtn">נסו שוב</button>
-    </div>
-
-    <section class="set-section">
-      <h3 class="set-section-title" id="setAccountTitle">חשבון</h3>
-      <div class="set-group">
-        <div class="set-row set-row-tap">
-          <span class="set-row-label">שם</span>
-          <span class="set-row-value" id="setNameValue"></span>
-          <button type="button" class="set-name-edit" id="setNameEdit" aria-label="עריכת השם">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.83 2.83 0 0 0-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg>
-          </button>
-        </div>
-        <div class="set-name-editor" id="setNameEditor" hidden>
-          <input type="text" id="setNameInput" maxlength="40" autocomplete="name" aria-label="שם">
-          <div class="set-name-editor-actions">
-            <button type="button" class="set-name-save" id="setNameSave">שמור</button>
-            <button type="button" id="setNameCancel">ביטול</button>
-          </div>
-        </div>
-        <div class="set-row set-row-tap set-contact-row">
-          <span class="set-row-label">פרטי קשר</span>
-          <div class="set-contact-view" id="setContactView">
-            <p class="set-contact-line" id="setPhoneText" dir="ltr"></p>
-            <p class="set-contact-line" id="setEmailText" dir="ltr"></p>
-            <p class="set-contact-empty" id="setContactEmpty" hidden>לא הוזנו</p>
-          </div>
-          <button type="button" class="set-name-edit set-contact-edit" id="setContactEdit" aria-label="עריכת פרטי קשר">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.83 2.83 0 0 0-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg>
-          </button>
-        </div>
-        <div class="set-contact-editor" id="setContactEditor" hidden>
-          <input type="tel" id="setPhone" inputmode="tel" placeholder="טלפון" autocomplete="tel" aria-label="טלפון">
-          <input type="email" id="setEmail" inputmode="email" placeholder="מייל" autocomplete="email" aria-label="מייל" dir="ltr">
-          <div class="set-name-editor-actions">
-            <button type="button" class="set-name-save" id="setContactSave">שמור</button>
-            <button type="button" id="setContactCancel">ביטול</button>
-          </div>
-        </div>
-        <p class="games-primary-reason set-row-note" id="setContactNote" hidden>פרטי הקשר מגיעים מחשבון Google.</p>
-        <button type="button" class="set-row set-row-btn" id="setSwapBtn">התנתקות</button>
-      </div>
-    </section>
-
-    <section class="set-section">
-      <h3 class="set-section-title">תצוגה</h3>
-      <div class="set-group">
-        <div class="set-row set-row-tap">
-          <span class="set-row-label" id="setThemeLabel">מצב כהה</span>
-          <button type="button" class="switch" id="setThemeSwitch" role="switch" aria-labelledby="setThemeLabel"></button>
-        </div>
-      </div>
-    </section>
-
-    <section class="set-section" id="setPush" hidden>
-      <h3 class="set-section-title">התראות</h3>
-      <div class="set-group">
-        <div class="set-row">
-          <span class="set-row-text">
-            <span class="set-row-label">התראות לטלפון</span>
-            <span class="set-row-sub" id="setPushNote"></span>
-          </span>
-          <button type="button" class="set-row-action" id="setPushBtn">הפעל</button>
-        </div>
-        <button type="button" class="set-row set-row-btn" id="setPushTestBtn" hidden>שלח התראת ניסיון</button>
-      </div>
-    </section>
-
-    <section class="set-section">
-      <h3 class="set-section-title">מידע</h3>
-      <div class="set-group">
-        <a class="set-row set-row-link" href="./privacy.html" target="_blank" rel="noopener">מדיניות פרטיות</a>
-        <a class="set-row set-row-link" href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a>
-      </div>
-    </section>
-
-    <section class="set-section">
-      <p class="settings-danger-title" id="setDangerTitle">אזור מסוכן</p>
-      <div class="set-group">
-        <button type="button" class="set-row set-row-btn danger" id="setClearBtn">איפוס רקורד</button>
-        <button type="button" class="set-row set-row-btn danger" id="setDeleteAccountToggle" hidden aria-expanded="false" aria-controls="setDeleteAccountPanel">מחיקת חשבון</button>
-        <div class="games-create-panel set-danger-panel" id="setDeleteAccountPanel">
-          <div class="games-create-panel-in">
-            <div class="games-create-panel-content">
-              <p class="games-primary-reason">החשבון, השם, האימייל והפרופיל שלך יימחקו לצמיתות — לא תוכל להתחבר שוב.</p>
-              <p class="games-primary-reason">היסטוריית המשחקים של החברים שלך נשמרת, השם שלך יופיע בה כמשתמש שנמחק.</p>
-              <button type="button" class="btn-close-table warn-state" id="deleteAccountHoldBtn"><span>מחיקה לצמיתות</span></button>
-              <p class="finish-game-hint" id="deleteAccountHint" hidden>המשך להחזיק כדי למחוק</p>
-              <button type="button" class="games-create-cancel" id="setDeleteAccountCancel">ביטול</button>
-              <p class="friend-error" id="deleteAccountError" hidden></p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <p class="set-version">גרסה 149</p>
-  </div>
-</div>
-
 <div class="login" id="groupSettings" hidden>
   <button type="button" class="back-arrow" id="groupSetBackBtn" aria-label="חזרה">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg>
@@ -2154,6 +2032,124 @@
 
   <section class="profile" id="profile" hidden></section>
   <section class="profile friends-page" id="friendsPage" hidden></section>
+  <section class="settings-page" id="settings" hidden>
+    <div class="set-in">
+      <div class="set-head">
+        <h2 class="set-title">הגדרות</h2>
+      </div>
+
+      <div class="set-identity">
+        <button type="button" class="pavatar-edit" id="setAvatar" aria-label="עריכת תמונת הפרופיל"></button>
+        <div class="set-name" id="setName"></div>
+        <p class="set-account" id="setAccount" dir="ltr" hidden></p>
+        <p class="set-local-note" id="setLocalNote" hidden>בלי חשבון · נשמר רק במכשיר הזה</p>
+      </div>
+
+      <div class="set-signin" id="setSignIn" hidden>
+        <p class="games-primary-reason" id="setSignInNote" hidden>עם חשבון המשחקים והחובות נשמרים גם בשרת, וחברים יכולים להזמין אותך לקבוצה.</p>
+        <button type="button" class="btn-primary btn-fill set-signin-btn" id="setSignInBtn" hidden>התחברות עם חשבון</button>
+      </div>
+      <div class="set-profile-fail" id="setProfileFail" hidden>
+        <p class="games-primary-reason">ההתחברות הצליחה אבל לא הצלחנו לטעון את החשבון.</p>
+        <button type="button" class="set-flat" id="setProfileRetryBtn">נסו שוב</button>
+      </div>
+
+      <section class="set-section">
+        <h3 class="set-section-title" id="setAccountTitle">חשבון</h3>
+        <div class="set-group">
+          <div class="set-row set-row-tap">
+            <span class="set-row-label">שם</span>
+            <span class="set-row-value" id="setNameValue"></span>
+            <button type="button" class="set-name-edit" id="setNameEdit" aria-label="עריכת השם">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.83 2.83 0 0 0-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg>
+            </button>
+          </div>
+          <div class="set-name-editor" id="setNameEditor" hidden>
+            <input type="text" id="setNameInput" maxlength="40" autocomplete="name" aria-label="שם">
+            <div class="set-name-editor-actions">
+              <button type="button" class="set-name-save" id="setNameSave">שמור</button>
+              <button type="button" id="setNameCancel">ביטול</button>
+            </div>
+          </div>
+          <div class="set-row set-row-tap set-contact-row">
+            <span class="set-row-label">פרטי קשר</span>
+            <div class="set-contact-view" id="setContactView">
+              <p class="set-contact-line" id="setPhoneText" dir="ltr"></p>
+              <p class="set-contact-line" id="setEmailText" dir="ltr"></p>
+              <p class="set-contact-empty" id="setContactEmpty" hidden>לא הוזנו</p>
+            </div>
+            <button type="button" class="set-name-edit set-contact-edit" id="setContactEdit" aria-label="עריכת פרטי קשר">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.83 2.83 0 0 0-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg>
+            </button>
+          </div>
+          <div class="set-contact-editor" id="setContactEditor" hidden>
+            <input type="tel" id="setPhone" inputmode="tel" placeholder="טלפון" autocomplete="tel" aria-label="טלפון">
+            <input type="email" id="setEmail" inputmode="email" placeholder="מייל" autocomplete="email" aria-label="מייל" dir="ltr">
+            <div class="set-name-editor-actions">
+              <button type="button" class="set-name-save" id="setContactSave">שמור</button>
+              <button type="button" id="setContactCancel">ביטול</button>
+            </div>
+          </div>
+          <p class="games-primary-reason set-row-note" id="setContactNote" hidden>פרטי הקשר מגיעים מחשבון Google.</p>
+          <button type="button" class="set-row set-row-btn" id="setSwapBtn">התנתקות</button>
+        </div>
+      </section>
+
+      <section class="set-section">
+        <h3 class="set-section-title">תצוגה</h3>
+        <div class="set-group">
+          <div class="set-row set-row-tap">
+            <span class="set-row-label" id="setThemeLabel">מצב כהה</span>
+            <button type="button" class="switch" id="setThemeSwitch" role="switch" aria-labelledby="setThemeLabel"></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="set-section" id="setPush" hidden>
+        <h3 class="set-section-title">התראות</h3>
+        <div class="set-group">
+          <div class="set-row">
+            <span class="set-row-text">
+              <span class="set-row-label">התראות לטלפון</span>
+              <span class="set-row-sub" id="setPushNote"></span>
+            </span>
+            <button type="button" class="set-row-action" id="setPushBtn">הפעל</button>
+          </div>
+          <button type="button" class="set-row set-row-btn" id="setPushTestBtn" hidden>שלח התראת ניסיון</button>
+        </div>
+      </section>
+
+      <section class="set-section">
+        <h3 class="set-section-title">מידע</h3>
+        <div class="set-group">
+          <a class="set-row set-row-link" href="./privacy.html" target="_blank" rel="noopener">מדיניות פרטיות</a>
+          <a class="set-row set-row-link" href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a>
+        </div>
+      </section>
+
+      <section class="set-section">
+        <p class="settings-danger-title" id="setDangerTitle">אזור מסוכן</p>
+        <div class="set-group">
+          <button type="button" class="set-row set-row-btn danger" id="setClearBtn">איפוס רקורד</button>
+          <button type="button" class="set-row set-row-btn danger" id="setDeleteAccountToggle" hidden aria-expanded="false" aria-controls="setDeleteAccountPanel">מחיקת חשבון</button>
+          <div class="games-create-panel set-danger-panel" id="setDeleteAccountPanel">
+            <div class="games-create-panel-in">
+              <div class="games-create-panel-content">
+                <p class="games-primary-reason">החשבון, השם, האימייל והפרופיל שלך יימחקו לצמיתות — לא תוכל להתחבר שוב.</p>
+                <p class="games-primary-reason">היסטוריית המשחקים של החברים שלך נשמרת, השם שלך יופיע בה כמשתמש שנמחק.</p>
+                <button type="button" class="btn-close-table warn-state" id="deleteAccountHoldBtn"><span>מחיקה לצמיתות</span></button>
+                <p class="finish-game-hint" id="deleteAccountHint" hidden>המשך להחזיק כדי למחוק</p>
+                <button type="button" class="games-create-cancel" id="setDeleteAccountCancel">ביטול</button>
+                <p class="friend-error" id="deleteAccountError" hidden></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <p class="set-version">גרסה 150</p>
+    </div>
+  </section><!-- /#settings -->
 
 </div>
 
@@ -2223,7 +2219,8 @@
   let groupCardArmedTimeout = null;
   const expandedGroupGames = new Set();
   let state = load();
-  let appView = "games";         // "friends" | "games" | "game" | "settle" | "profile" | "group"
+  let appView = "games";         // "friends" | "games" | "game" | "settle" | "profile" | "group" | "settings"
+  let settingsReturnView = "profile"; // the tab the gear opened settings from; the gear goes back to it
   let currentGroupId = null;  // UI-only: which group's page or preview is open
   let openMenu = null;        // player name whose buy-in menu is open
   let menuJustOpened = null;  // menu that should animate open on the next render
@@ -6831,7 +6828,7 @@
     // navigation into it, which reads as a stray flicker rather than the dashboard just sitting
     // there dimmed.
     if (nextView === "group") return;
-    const id = nextView === "profile" ? "profile" : nextView === "friends" ? "friendsPage" : (nextView === "game" || nextView === "settle") ? "rows" : "gamesHome";
+    const id = nextView === "profile" ? "profile" : nextView === "friends" ? "friendsPage" : nextView === "settings" ? "settings" : (nextView === "game" || nextView === "settle") ? "rows" : "gamesHome";
     const container = document.getElementById(id);
     if (!container) return;
     container.classList.remove("load-in");
@@ -9521,19 +9518,26 @@
     document.body.classList.toggle("game-view", appView === "game");
     document.body.classList.toggle("settle-view", appView === "settle");
     document.body.classList.toggle("friends-view", appView === "friends");
+    document.body.classList.toggle("settings-view", appView === "settings");
     document.getElementById("modeFriends").classList.toggle("on", appView === "friends");
     document.getElementById("modeGames").classList.toggle("on", inGames);
     document.getElementById("modeProfile").classList.toggle("on", appView === "profile");
     document.getElementById("addrow").hidden = appView !== "game";
     renderTableHeader();
     renderAddRowChips();
-    // Settings gear: profile, friends and the games dashboard. The group page has its own "הגדרות" (group
-    // settings) in its header, and game/settle keep the reset control in that corner.
-    document.getElementById("settingsBtn").hidden = appView !== "profile" && appView !== "games" && appView !== "friends";
-    document.getElementById("resetBtn").hidden = appView === "profile" || appView === "friends" || appView === "games" || appView === "group";
+    // Settings gear: profile, friends and the games dashboard, and settings itself, where it stays lit
+    // (no tab is "on" there -- the gear is). The group page has its own "הגדרות" (group settings) in
+    // its header, and game/settle keep the reset control in that corner.
+    const settingsBtn = document.getElementById("settingsBtn");
+    settingsBtn.hidden = appView !== "profile" && appView !== "games" && appView !== "friends" && appView !== "settings";
+    settingsBtn.classList.toggle("on", appView === "settings");
+    settingsBtn.setAttribute("aria-pressed", appView === "settings" ? "true" : "false");
+    document.getElementById("resetBtn").hidden = appView === "profile" || appView === "friends" || appView === "games" || appView === "group" || appView === "settings";
     refreshResetCorner();
     document.getElementById("gamesHome").hidden = appView !== "games" && appView !== "group";
     document.getElementById("friendsPage").hidden = appView !== "friends";
+    document.getElementById("settings").hidden = appView !== "settings";
+    if (appView === "settings") refreshSettings();
 
     const rows = document.getElementById("rows");
     rows.innerHTML = "";
@@ -12559,14 +12563,20 @@
       if (e.key === "Escape") closeSetContactEditor();
     });
   }
+  // The gear opens settings in place of the current tab and lights up; tapping it again (or any
+  // tab) goes back. Settings always opens on its read-only view.
   document.getElementById("settingsBtn").addEventListener("click", () => {
-    setContactEditing = false; // the overlay always opens on the read-only view
-    refreshSettings();
-    document.getElementById("settings").hidden = false;
+    if (appView === "settings") { leaveSettings(); return; }
+    settingsReturnView = appView;
+    setContactEditing = false;
+    setNameEditing = false;
+    closeDeleteAccountPanel();
+    setAppView("settings");
   });
-  document.getElementById("setBackBtn").addEventListener("click", () => {
-    document.getElementById("settings").hidden = true;
-  });
+  function leaveSettings() {
+    if (appView === "settings") setAppView(settingsReturnView || "profile");
+    else render();
+  }
   document.getElementById("setAvatar").addEventListener("click", openAvatarEditor);
   // A whole settings row is a tap target for the control inside it (the pencil, the switch); the
   // control itself stays the keyboard and screen-reader entry point.
@@ -12609,7 +12619,7 @@
   document.getElementById("setSignInBtn").addEventListener("click", () => {
     // Keeps `me` and local history untouched — this is a path back into an account, not a
     // sign-out. showLogin() itself never clears `me`.
-    document.getElementById("settings").hidden = true;
+    leaveSettings();
     showLogin();
   });
   document.getElementById("setPushBtn").addEventListener("click", enablePushNotifications);
@@ -12623,8 +12633,7 @@
   document.getElementById("setSwapBtn").addEventListener("click", () => {
     signOutAccount(); // ends the Supabase session first when there is one; no-op in local mode
     me = null; saveMe();
-    document.getElementById("settings").hidden = true;
-    render();
+    leaveSettings();
     showLogin();
   });
   let setClearArmed = null;
@@ -12646,8 +12655,7 @@
     btn.classList.remove("armed");
     state.history = [];
     markReal(); save();
-    document.getElementById("settings").hidden = true;
-    render();
+    leaveSettings();
   });
 
   // ---------- account deletion (danger zone) ----------
@@ -12750,9 +12758,8 @@
     save();
     me = null; saveMe();
     deleteAccountBusy = false;
-    document.getElementById("settings").hidden = true;
     closeDeleteAccountPanel();
-    render();
+    leaveSettings();
     loginNote = "החשבון נמחק בהצלחה";
     showLogin();
   }
