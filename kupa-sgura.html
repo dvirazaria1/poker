@@ -624,6 +624,34 @@
   .games-group-copy { flex: 1 1 auto; min-width: 0; }
   .games-group-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .games-empty { color: var(--faint); font-size: 14px; font-weight: 300; margin: 0; }
+  /* ---------- Games, empty (no group, no open table): a dealer's spread over ghost cards ----------
+     Designed with the owner on 2026-10-08. Every name here is gh-* / GH_* so it never meets the
+     connecting game's deal-* cards. */
+  .gh-hero { margin: 2px 0 4px; }
+  .gh-stage { position: relative; height: 118px; pointer-events: none; }
+  .gh-cap { text-align: center; font-size: 14px; font-weight: 800; margin: 0; }
+  .gh-o { position: absolute; left: calc(50% - 19px); top: calc(50% - 27px); width: 38px; height: 54px; }
+  .gh-c { position: relative; width: 100%; height: 100%; transform-origin: 50% 50%; transform-style: preserve-3d; }
+  .gh-face, .gh-back { position: absolute; inset: 0; border-radius: 4px; overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; direction: ltr; }
+  .gh-face { background: var(--card-face); color: #0C1519; box-shadow: 0 0 0 1px rgba(12,21,25,.10), 0 2px 6px -2px rgba(12,21,25,.18); }
+  .gh-face.red { color: var(--card-red); }
+  .gh-face svg { display: block; fill: currentColor; }
+  .gh-ix { position: absolute; width: 12px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .gh-ix.tl { top: 4px; left: 4px; }
+  .gh-ix.br { bottom: 4px; right: 4px; }
+  .gh-ix b { font: 800 14px/1 Heebo, sans-serif; letter-spacing: -.03em; }
+  .gh-ix b.ten { letter-spacing: -.12em; margin-left: -2px; }
+  .gh-ix svg { width: 9px; height: 9px; }
+  .gh-back { transform: rotateY(180deg); background: #067D78; box-shadow: inset 0 0 0 2px #fff, 0 0 0 1px rgba(12,21,25,.12), 0 2px 6px -2px rgba(12,21,25,.2); }
+  .gh-back::before { content: ""; position: absolute; inset: 4px; border: 1px solid rgba(255,255,255,.4); border-radius: 2px; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.14) 0 1px, transparent 1px 5px), repeating-linear-gradient(-45deg, rgba(255,255,255,.14) 0 1px, transparent 1px 5px); }
+  .gh-tag { position: absolute; left: 50%; top: calc(50% + 34px); width: 160px; margin-left: -80px; text-align: center; opacity: 0; }
+  .gh-tag span { display: inline-block; height: 22px; padding: 0 10px; border-radius: 999px; font: 600 12px/22px Heebo, sans-serif; color: var(--accent-fill); background: color-mix(in srgb, var(--accent) 10%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); }
+  .gh-cta { width: 100%; min-height: 56px; padding: 11px 12px; display: flex; align-items: center; gap: 10px; border: 1.5px dashed var(--accent); border-radius: 16px; color: var(--accent); font-size: 14px; font-weight: 700; text-align: start; transition: background-color .2s; }
+  .gh-cta-ic { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 50%; border: 1.5px dashed var(--accent); display: flex; align-items: center; justify-content: center; }
+  .gh-cta-ic svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+  .gh-ghost { margin-top: 8px; padding: 11px 12px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 16px; }
+  .gh-ghost-av { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 50%; background: var(--line); }
+  .gh-ghost-line { height: 8px; width: 55%; border-radius: 5px; background: var(--line); }
 
   /* create-group inline panel — same grid-collapse transition as .pmenu */
   .games-create-panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .28s ease; margin-top: 14px; }
@@ -1319,6 +1347,7 @@
     .games-quick-action.primary:hover { background: var(--accent); color: var(--bg); }
     .games-card-enter:hover { background: var(--accent); color: var(--bg); }
     .games-solo-card:hover, .games-solo-card:hover .games-solo-icon { border-color: var(--accent); color: var(--accent); }
+    .gh-cta:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
     .games-group-action:not(:disabled):hover { border-color: var(--accent); color: var(--accent); }
     .games-group-table-btn:not(:disabled):hover { background: var(--accent); color: var(--bg); }
     .games-group-stats-btn:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -1707,7 +1736,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 127</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 128</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -7239,14 +7268,29 @@
     createGroupBtn.type = "button";
     createGroupBtn.setAttribute("aria-expanded", String(createGroupOpen));
     createGroupBtn.addEventListener("click", toggleCreateGroupPanel);
-    heading.appendChild(createGroupBtn);
+    // With no group yet the dashed "צור את הקבוצה הראשונה" card below is the one way in.
+    if (groups.length) heading.appendChild(createGroupBtn);
     section.appendChild(heading);
     // The panel opens directly under this heading/button, above the list -- with 8+ groups,
     // appending it after the whole list (the old order) put it far off-screen from the button
     // that summoned it.
     renderCreateGroupPanel(section);
     if (!groups.length) {
-      section.appendChild(el("p", "games-empty", "אין לך קבוצות עדיין"));
+      // No group yet: a dashed card to create the first one, and two faded ghost rows that hint
+      // at the list it will start (2026-10-08 owner pick).
+      const cta = el("button", "gh-cta");
+      cta.type = "button";
+      cta.setAttribute("aria-expanded", String(createGroupOpen));
+      cta.innerHTML = '<span class="gh-cta-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"></path></svg></span><span>צור את הקבוצה הראשונה</span>';
+      cta.addEventListener("click", toggleCreateGroupPanel);
+      section.appendChild(cta);
+      [.3, .15].forEach(opacity => {
+        const ghost = el("div", "gh-ghost");
+        ghost.setAttribute("aria-hidden", "true");
+        ghost.style.opacity = String(opacity);
+        ghost.innerHTML = '<span class="gh-ghost-av"></span><span class="gh-ghost-line"></span>';
+        section.appendChild(ghost);
+      });
     } else {
       const list = el("div", "games-group-list");
       groups.forEach((group, idx) => {
@@ -7660,6 +7704,198 @@
   }
 
 
+  // ---------- Games, empty: the dealer's spread (2026-10-08, designed with the owner) ----------
+  // Five cards in a shallow arc above the ghost cards. On arrival the dealer riffles, rolls the
+  // deck over sideways onto the arc's left end, and the top card -- the river -- leads a table
+  // spread to the right end, the others smearing out behind it (bottom card stays left), so the
+  // hand reads A K Q J 10 left to right with each card over the one to its left. While the
+  // screen sits idle, every few seconds: gather, roll back, two riffles, a new strong hand.
+  // Built once and reused across re-renders (renderGamesDashboard rebuilds #gamesHome on every
+  // sync), so a background refresh never restarts it; it stops when the screen stops being empty.
+  const GH_SUITS = {
+    s: '<path d="M12 1.8c-1.9 3-9.2 7.6-9.2 12.1 0 2.7 2.1 4.6 4.6 4.6 1.5 0 2.8-.6 3.6-1.7-.3 2.1-1.1 3.7-2.6 5.3h7.2c-1.5-1.6-2.3-3.2-2.6-5.3.8 1.1 2.1 1.7 3.6 1.7 2.5 0 4.6-1.9 4.6-4.6 0-4.5-7.3-9.1-9.2-12.1z"/>',
+    h: '<path d="M12 21.6S2.4 15.8 2.4 8.9C2.4 5.6 4.8 3 7.9 3c1.8 0 3.2.9 4.1 2.4C12.9 3.9 14.3 3 16.1 3c3.1 0 5.5 2.6 5.5 5.9 0 6.9-9.6 12.7-9.6 12.7z"/>',
+    d: '<path d="M12 1.6c.5 0 .9.2 1.2.6l7.4 8.6c.6.7.6 1.7 0 2.4l-7.4 8.6c-.6.8-1.8.8-2.4 0l-7.4-8.6c-.6-.7-.6-1.7 0-2.4l7.4-8.6c.3-.4.7-.6 1.2-.6z"/>',
+    c: '<circle cx="12" cy="6.6" r="4.6"/><circle cx="6.3" cy="13.6" r="4.6"/><circle cx="17.7" cy="13.6" r="4.6"/><path d="M10.5 12.5h3c.1 3.4.9 5.8 2.8 8.3H7.7c1.9-2.5 2.7-4.9 2.8-8.3z"/>',
+  };
+  const GH_HANDS = [
+    ["רויאל פלאש", ["As", "Ks", "Qs", "Js", "10s"]],
+    ["פול האוס", ["Kh", "Ks", "Kd", "7c", "7h"]],
+    ["פלאש", ["Ah", "Jh", "9h", "6h", "3h"]],
+    ["סטרייט", ["9d", "8c", "7s", "6h", "5c"]],
+    ["רביעייה", ["Qs", "Qh", "Qd", "Qc", "4s"]],
+    ["סטרייט פלאש", ["9c", "8c", "7c", "6c", "5c"]],
+  ];
+  const GH_REST_MS = 5000;
+  const GH_EASE = {
+    silk: "cubic-bezier(.65,0,.35,1)", spread: "cubic-bezier(.3,.7,.2,1)", gather: "cubic-bezier(.5,0,.3,1)",
+    push: "cubic-bezier(.35,0,.25,1)", pop: "cubic-bezier(.25,.7,.4,1)", fall: "cubic-bezier(.55,0,.85,.45)", felt: "cubic-bezier(.16,.84,.3,1)",
+  };
+  let ghHero = null;
+
+  function renderGamesEmptyHero(parent) {
+    if (!ghHero) {
+      const wrap = el("div", "gh-hero");
+      const stage = el("div", "gh-stage");
+      stage.setAttribute("aria-hidden", "true");
+      wrap.append(stage, el("p", "gh-cap", "הערב הראשון מתחיל כאן"));
+      ghHero = { wrap, stage, gen: 0, running: false };
+    }
+    parent.appendChild(ghHero.wrap);
+    if (!ghHero.running) {
+      ghHero.running = true;
+      const hero = ghHero;
+      afterNextFrame(() => ghStart(hero)); // needs the stage laid out (its width)
+    }
+  }
+  function ghStop() {
+    if (!ghHero) return;
+    ghHero.gen++;
+    ghHero.running = false;
+    ghHero.stage.getAnimations({ subtree: true }).forEach(a => a.cancel());
+    ghHero.stage.innerHTML = "";
+  }
+  function ghSuit(s) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + GH_SUITS[s] + "</svg>"; }
+  function ghPaint(card, code) {
+    const rank = code.slice(0, -1), suit = code.slice(-1);
+    const ix = '<b' + (rank === "10" ? ' class="ten"' : "") + ">" + rank + "</b>" + ghSuit(suit);
+    card.face.className = "gh-face" + (suit === "h" || suit === "d" ? " red" : "");
+    card.face.innerHTML = '<span class="gh-ix tl">' + ix + '</span><span class="gh-ix br">' + ix + "</span>";
+  }
+  // One move of one card: keyframes from the pose it is headed to, committed when it lands.
+  function ghSeg(card, frames, duration, easing, firstEasing) {
+    const kf = [{ transform: card.tf(card.target), offset: 0 }];
+    if (firstEasing) kf[0].easing = firstEasing;
+    frames.forEach(f => { const k = { transform: card.tf(f.p) }; if (f.o != null) k.offset = f.o; if (f.e) k.easing = f.e; kf.push(k); });
+    kf[kf.length - 1].offset = 1;
+    const last = frames[frames.length - 1].p;
+    card.target = last;
+    const a = card.c.animate(kf, { duration, easing: easing || "linear", fill: "forwards" });
+    return a.finished.then(() => { if (card.target === last) card.c.style.transform = card.tf(last); a.cancel(); }).catch(() => {});
+  }
+  function ghStart(hero) {
+    const g = ++hero.gen;
+    const stage = hero.stage;
+    stage.getAnimations({ subtree: true }).forEach(a => a.cancel());
+    stage.innerHTML = "";
+    if (!stage.isConnected) { hero.running = false; return; }
+    const at = (t, fn) => setTimeout(() => { if (g === hero.gen && stage.isConnected) fn(); }, Math.max(0, t));
+    const tf = p => "translate(" + p.x + "px," + p.y + "px) rotate(" + p.r + "deg) perspective(460px) rotateY(" + p.f + "deg) scale(" + p.s + ")";
+    const P = (x, y, r, f, s) => ({ x, y, r: r || 0, f: f == null ? 180 : f, s: s == null ? 1 : s });
+    const RAD = 300, SPAN = 8.3; // a shallow arc: the ends sit ~3px lower than the middle
+    const ang = pos => -SPAN + (2 * SPAN / 4) * pos; // pos 0 = left end .. 4 = right end
+    const arc = (deg, f) => { const t = deg * Math.PI / 180; return P(RAD * Math.sin(t), -10 + RAD * (1 - Math.cos(t)), deg, f, 1); };
+    const HOME = arc(ang(0), 0), CENTER = P(0, -10, 0, 180, 1);
+    const layer = (base, L, f) => P(base.x - 0.25 * L, base.y - 0.5 * L, base.r, f, 1);
+    const W = stage.getBoundingClientRect().width || 320;
+    const tag = el("div", "gh-tag");
+    tag.innerHTML = "<span></span>";
+    // card.m: place in the face-down deck (0 bottom .. 4 top); rolled over, m 0 is on top and
+    // ends at the right end, so card m shows the hand's card at position 4 - m.
+    const cards = [0, 1, 2, 3, 4].map(() => {
+      const o = el("div", "gh-o"), c = el("div", "gh-c"), face = el("div", "gh-face"), back = el("div", "gh-back");
+      c.append(face, back);
+      o.appendChild(c);
+      stage.appendChild(o);
+      const card = { o, c, face, tf, target: P(-W / 2 - 30, -34, -22, 180, 1) };
+      c.style.transform = tf(card.target);
+      return card;
+    });
+    stage.appendChild(tag);
+    const posOf = c => 4 - c.m;
+    const paintAll = h => cards.forEach(c => ghPaint(c, GH_HANDS[h][1][posOf(c)]));
+    const showTag = name => { tag.firstChild.textContent = name; tag.animate([{ opacity: 0, transform: "translateY(4px) scale(.96)" }, { opacity: 1, transform: "none" }], { duration: 320, easing: GH_EASE.spread, fill: "forwards" }); };
+    const hideTag = () => tag.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(3px) scale(.98)" }], { duration: 180, easing: "ease-in", fill: "forwards" });
+    const z = up => cards.forEach(c => { c.o.style.zIndex = up ? 5 - c.m : c.m + 1; });
+
+    if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      cards.forEach((c, k) => { c.m = k; c.target = arc(ang(posOf(c)), 0); c.c.style.transform = tf(c.target); });
+      z(true);
+      paintAll(0);
+      tag.firstChild.textContent = GH_HANDS[0][0];
+      tag.style.opacity = "1";
+      return;
+    }
+    // the deck rolls over its edge to the side: centre -> left end face up, and back again
+    const flipDeck = (t, up) => at(t, () => {
+      cards.forEach(c => {
+        const end = up ? layer(HOME, 4 - c.m, 0) : layer(CENTER, c.m, 180), from = c.target;
+        ghSeg(c, [{ p: P((from.x + end.x) / 2, Math.min(from.y, end.y) - 12, (from.r + end.r) / 2, 90, 1.05), o: .5 }, { p: end }], 460, GH_EASE.silk);
+      });
+      at(230, () => z(up));
+    });
+    const riffle = (t, order, splitDur) => {
+      at(t, () => cards.forEach(c => {
+        if (c.m >= 3) {
+          c.o.style.zIndex = 20 + c.m;
+          const j = c.m - 3, to = P(-20 - 0.25 * j, -10 - 0.5 * j, -6), from = c.target;
+          ghSeg(c, [{ p: P((from.x + to.x) / 2, (from.y + to.y) / 2 - 6, -3, 180, 1.05), o: .5 }, { p: to }], splitDur, GH_EASE.push);
+        } else {
+          c.o.style.zIndex = 10 + c.m;
+          ghSeg(c, [{ p: P(20 - 0.25 * c.m, -10 - 0.5 * c.m, 6) }], splitDur, GH_EASE.push);
+        }
+      }));
+      at(t + splitDur + 20, () => {
+        const byM = {};
+        cards.forEach(c => { byM[c.m] = c; });
+        order.forEach((m, k) => {
+          const c = byM[m];
+          c.o.style.zIndex = k + 1;
+          c.k = k;
+          const from = c.target;
+          at(35 * k, () => ghSeg(c, [{ p: P(from.x, from.y - 3, from.r * .6, 180, 1.03), o: .35, e: GH_EASE.fall }, { p: layer(CENTER, k, 180) }], 130, "linear", GH_EASE.pop));
+        });
+        cards.forEach(c => { c.m = c.k; });
+      });
+    };
+    // all cards move together for the same time; the top one travels furthest, so it leads
+    const spread = t => at(t, () => cards.forEach(c => {
+      const to = ang(posOf(c));
+      ghSeg(c, [.2, .4, .6, .8, 1].map(p => ({ p: arc(ang(0) + (to - ang(0)) * p, 0), o: p })), 620, GH_EASE.spread);
+    }));
+    const close = t => at(t, () => cards.forEach(c => {
+      const from = ang(posOf(c));
+      const frames = [.25, .5, .75].map(p => ({ p: arc(from + (ang(0) - from) * p, 0), o: p * .9 }));
+      frames.push({ p: layer(HOME, 4 - c.m, 0) });
+      ghSeg(c, frames, 460, GH_EASE.gather);
+    }));
+    const entry = h => {
+      cards.forEach((c, k) => { c.m = k; c.o.style.zIndex = k + 1; c.o.style.opacity = "0"; });
+      cards.forEach((c, k) => at(80 + 90 * k, () => {
+        c.o.animate([{ opacity: 0 }, { opacity: 1, offset: .2 }, { opacity: 1 }], { duration: 520, fill: "forwards" });
+        ghSeg(c, [{ p: layer(CENTER, k, 180) }], 520, GH_EASE.felt);
+      }));
+      riffle(1000, [0, 3, 1, 4, 2], 200);
+      at(1500, () => paintAll(h));
+      flipDeck(1520, true);
+      spread(2020);
+      at(2560, () => showTag(GH_HANDS[h][0]));
+      return 2880;
+    };
+    const cycle = h => {
+      at(0, hideTag);
+      close(40);
+      flipDeck(540, false);
+      riffle(1020, [0, 3, 1, 4, 2], 200);
+      riffle(1530, [3, 0, 4, 1, 2], 180);
+      at(2020, () => paintAll(h));
+      flipDeck(2040, true);
+      spread(2540);
+      at(3080, () => showTag(GH_HANDS[h][0]));
+      return 3400;
+    };
+    let hand = 0;
+    const loop = delay => setTimeout(() => {
+      if (g !== hero.gen) return;
+      if (!stage.isConnected) { hero.running = false; return; } // left the empty screen: start fresh next time
+      // Only shuffle where someone can see it (a hidden tab or another app screen just waits).
+      if (document.hidden || !stage.offsetParent) { loop(GH_REST_MS); return; }
+      hand = (hand + 1) % GH_HANDS.length;
+      loop(cycle(hand) + GH_REST_MS);
+    }, delay);
+    loop(entry(hand) + GH_REST_MS);
+  }
+
   function renderGamesDashboard() {
     // A deferred call (a panel's collapse setTimeout) can still fire after the user has
     // navigated away from the dashboard — bail instead of rebuilding a #gamesHome that's now
@@ -7681,8 +7917,11 @@
     const inner = el("div", "games-home-in games-home-dash");
     inner.appendChild(el("h2", "games-home-title", "השולחנות שלך"));
     inner.appendChild(el("p", "games-home-lead", "המשחקים הפעילים והקבוצות שלך במקום אחד."));
-    renderActiveGamesSection(inner, getActiveGameSummaries(state, state.groups), enterStagger);
-    renderGroupsSection(inner, getGroupSummaries(collectionsOf(state), me, cloudGroupAggregates), enterStagger);
+    const activeSummaries = getActiveGameSummaries(state, state.groups);
+    const groupSummaries = getGroupSummaries(collectionsOf(state), me, cloudGroupAggregates);
+    if (!activeSummaries.length && !groupSummaries.length) renderGamesEmptyHero(inner); else ghStop();
+    renderActiveGamesSection(inner, activeSummaries, enterStagger);
+    renderGroupsSection(inner, groupSummaries, enterStagger);
     renderQuickActions(inner);
     renderArchivedGroupsSection(inner, getArchivedGroupSummaries(collectionsOf(state), me, cloudGroupAggregates));
     box.appendChild(inner);

@@ -193,7 +193,7 @@ test('renderCreateGroupPanel is called right after the heading, before the group
   const headingIdx = source.indexOf('section.appendChild(heading)');
   const panelIdx = source.indexOf('renderCreateGroupPanel(section)');
   const listIdx = source.indexOf('games-group-list');
-  const emptyIdx = source.indexOf('אין לך קבוצות עדיין');
+  const emptyIdx = source.indexOf('el("button", "gh-cta")'); // 2026-10-08: the empty state is a dashed card
   assert.ok(headingIdx >= 0 && panelIdx >= 0 && listIdx >= 0 && emptyIdx >= 0, 'expected markers not found');
   assert.ok(headingIdx < panelIdx, 'the panel must be requested after the heading is appended');
   assert.ok(panelIdx < listIdx, 'the panel must be appended before the group list, not after it');

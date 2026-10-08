@@ -137,8 +137,8 @@ test('dashboard cards stagger in only right after a navigation, not on every in-
   const dashboardSource = sourceBetween('  function renderGamesDashboard()', '  function openGroupPreview(groupId) {');
   assert.match(dashboardSource, /const enterStagger = gamesPageEnterNext;/);
   assert.match(dashboardSource, /gamesPageEnterNext = false;/);
-  assert.match(dashboardSource, /renderActiveGamesSection\(inner, getActiveGameSummaries\(state, state\.groups\), enterStagger\)/);
-  assert.match(dashboardSource, /renderGroupsSection\(inner, getGroupSummaries\(collectionsOf\(state\), me, cloudGroupAggregates\), enterStagger\)/);
+  assert.match(dashboardSource, /renderActiveGamesSection\(inner, activeSummaries, enterStagger\)/);
+  assert.match(dashboardSource, /renderGroupsSection\(inner, groupSummaries, enterStagger\)/);
 });
 
 test('active-game and group cards accept an anim/animDelay pair to drive the entrance stagger', () => {
@@ -180,4 +180,46 @@ test('every top-row tile of the open card is 54px tall, and the statistics tile 
   assert.match(html, /\.games-group-table-btn \{\s*flex: 1 1 auto; min-width: 0; height: 54px;/);
   assert.match(html, /\.games-group-stats-btn \{\s*flex: 0 0 96px; height: 54px;/);
   assert.doesNotMatch(html, /\.games-group-tabs \.games-group-stats-btn \{ flex-basis/);
+});
+
+// ---------- Games, empty (2026-10-08): the dealer's spread over ghost cards ----------
+
+test('an empty Games screen shows the dealer hero; anything to list stops it', () => {
+  const dash = sourceBetween('  function renderGamesDashboard() {', '  // Task 6: a body scroll-lock');
+  assert.match(dash, /if \(!activeSummaries\.length && !groupSummaries\.length\) renderGamesEmptyHero\(inner\); else ghStop\(\);/);
+  const hero = sourceBetween('  function renderGamesEmptyHero(parent) {', '  function ghStop() {');
+  // built once and re-appended, so a background re-render never restarts the animation
+  assert.match(hero, /if \(!ghHero\) \{/);
+  assert.match(hero, /parent\.appendChild\(ghHero\.wrap\);/);
+  assert.match(hero, /if \(!ghHero\.running\) \{/);
+});
+
+test('the dealer hero keeps to its own names, honours reduced motion, and only shuffles where it is seen', () => {
+  const mod = sourceBetween('  // ---------- Games, empty: the dealer\'s spread', '  function renderGamesDashboard() {');
+  assert.doesNotMatch(mod, /\bdeal-card\b|\bDEAL_/);
+  assert.match(mod, /matchMedia\("\(prefers-reduced-motion: reduce\)"\)\.matches/);
+  assert.match(mod, /if \(document\.hidden \|\| !stage\.offsetParent\) \{ loop\(GH_REST_MS\); return; \}/);
+  assert.match(mod, /if \(!stage\.isConnected\) \{ hero\.running = false; return; \}/);
+});
+
+test('every dealer hand has five cards with a known suit, and the spread reads the hand left to right', () => {
+  const src = sourceBetween('  const GH_SUITS = {', '  const GH_REST_MS');
+  const context = vm.createContext({});
+  vm.runInContext(src.replace('const GH_SUITS', 'var GH_SUITS').replace('const GH_HANDS', 'var GH_HANDS'), context);
+  const hands = vm.runInContext('GH_HANDS', context), suits = vm.runInContext('GH_SUITS', context);
+  hands.forEach(([name, cards]) => {
+    assert.ok(name.length > 0);
+    assert.equal(cards.length, 5);
+    cards.forEach(code => assert.ok(suits[code.slice(-1)], code));
+  });
+  const mod = sourceBetween('  function ghStart(hero) {', '  function renderGamesDashboard() {');
+  assert.match(mod, /const posOf = c => 4 - c\.m;/);
+  assert.match(mod, /const paintAll = h => cards\.forEach\(c => ghPaint\(c, GH_HANDS\[h\]\[1\]\[posOf\(c\)\]\)\);/);
+});
+
+test('with no group, the groups section is a dashed "צור את הקבוצה הראשונה" card and two ghost rows', () => {
+  const src = sourceBetween('  function renderGroupsSection(', '  // 2026-10-08 (owner ask): tapping a group card');
+  assert.match(src, /if \(groups\.length\) heading\.appendChild\(createGroupBtn\);/);
+  assert.match(src, /cta\.addEventListener\("click", toggleCreateGroupPanel\);/);
+  assert.match(src, /\[\.3, \.15\]\.forEach/);
 });

@@ -124,17 +124,20 @@ test('Games dashboard is composed from three modular sections', () => {
   assert.match(html, /renderQuickActions\(inner\)/);
   // Task 9: getActiveGameSummaries gains an optional `groups` argument for title resolution;
   // the dashboard call site passes state.groups.
-  assert.match(html, /renderActiveGamesSection\(inner, getActiveGameSummaries\(state, state\.groups\), enterStagger\)/);
+  // 2026-10-08: the summaries are read once (the empty-state hero needs them too) and passed on.
+  assert.match(html, /const activeSummaries = getActiveGameSummaries\(state, state\.groups\);/);
+  assert.match(html, /renderActiveGamesSection\(inner, activeSummaries, enterStagger\)/);
   // getGroupSummaries now also takes the safe group aggregates cache as a 3rd arg (see
   // resolveGroupLeaderboard/resolveGroupGameSummaries) so the dashboard's group cards read
   // safe server-side rollups when available, falling back to local computation otherwise.
-  assert.match(html, /renderGroupsSection\(inner, getGroupSummaries\(collectionsOf\(state\), me, cloudGroupAggregates\), enterStagger\)/);
+  assert.match(html, /const groupSummaries = getGroupSummaries\(collectionsOf\(state\), me, cloudGroupAggregates\);/);
+  assert.match(html, /renderGroupsSection\(inner, groupSummaries, enterStagger\)/);
   // An empty active-games list now renders nothing at all -- no heading and no line, the same
   // rule renderGroupLeaders follows for an empty ranking. Asserting the absence is stronger than
   // the old presence check: a reappearing placeholder would now fail.
   assert.doesNotMatch(html, /אין משחקים פעילים כרגע/);
   assert.match(html, /function renderActiveGamesSection\(parent, summaries, enterStagger\) \{\n    if \(!summaries\.length\) return;/);
-  assert.match(html, /אין לך קבוצות עדיין/);
+  assert.match(html, /צור את הקבוצה הראשונה/); // 2026-10-08: the no-groups state is a dashed card
   // Task 3 enables the create-group quick action; it's no longer a "coming soon" placeholder.
   assert.doesNotMatch(html, /בקרוב/);
   assert.match(html, /toggleCreateGroupPanel/);
