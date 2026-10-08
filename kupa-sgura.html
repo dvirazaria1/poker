@@ -1577,7 +1577,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 117</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 118</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -11337,7 +11337,8 @@
     const slot = two ? d.slot : 0;
     ui.twoRow.setAttribute("aria-checked", String(two));
     ui.twoKnob.classList.toggle("on", two);
-    ui.twoSub.textContent = two ? "היד האהובה שלך" : "כבוי — קלף אחד";
+    ui.twoSub.textContent = "כבוי — קלף אחד";
+    ui.twoSub.hidden = two; // with the switch on, the two cards below say it by themselves
     ui.cardBtns.forEach((c, i) => {
       const card = d.hand[i];
       c.btn.hidden = i >= d.count;
