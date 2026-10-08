@@ -6,7 +6,7 @@ const html = fs.readFileSync('kupa-sgura.html', 'utf8');
 const appScript = html.slice(html.lastIndexOf('<script>') + '<script>'.length, html.lastIndexOf('</script>'));
 
 test('settings places a touch-sized inline name editor beside the displayed name', () => {
-  const settings = html.slice(html.indexOf('<div class="login" id="settings"'), html.indexOf('<div class="login" id="groupSettings"'));
+  const settings = html.slice(html.indexOf('<section class="settings-page" id="settings"'), html.indexOf('</section><!-- /#settings -->'));
   assert.match(settings, /class="set-name-edit" id="setNameEdit" aria-label="עריכת השם"/);
   assert.match(settings, /class="set-name-editor" id="setNameEditor" hidden/);
   assert.match(settings, /id="setNameInput" maxlength="40" autocomplete="name" aria-label="שם"/);

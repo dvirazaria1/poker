@@ -183,7 +183,7 @@ test('the settings overlay shows the signed-in address and no new localStorage k
 // without touching `me`.
 
 test('the settings overlay has a sign-in control, hidden by default, above the sign-out button', () => {
-  const settings = html.slice(html.indexOf('<div class="login" id="settings"'), html.indexOf('<div class="login" id="groupSettings"'));
+  const settings = html.slice(html.indexOf('<section class="settings-page" id="settings"'), html.indexOf('</section><!-- /#settings -->'));
   assert.match(settings, /<p class="games-primary-reason" id="setSignInNote" hidden>[^<]*<\/p>/);
   // 2026-10-08 settings list: the sign-in is the screen's one filled button for a local player
   assert.match(settings, /<button type="button" class="btn-primary btn-fill set-signin-btn" id="setSignInBtn" hidden>התחברות עם חשבון<\/button>/);
@@ -202,7 +202,8 @@ test('the sign-in button opens the login overlay and never clears `me`', () => {
   assert.match(handler, /showLogin\(\)/);
   assert.ok(!/\bme\s*=\s*null\b/.test(handler), 'must not clear the local name');
   assert.ok(!/signOutAccount\(\)/.test(handler), 'must not sign out of Supabase');
-  assert.match(handler, /document\.getElementById\("settings"\)\.hidden = true;/);
+  // settings is a view now: the handler leaves it (back to the tab it came from) before the login
+  assert.match(handler, /leaveSettings\(\);\s*showLogin\(\);/);
 });
 
 test('refreshSettings branches sign-in visibility and reserves the swap button for signed-in accounts', () => {

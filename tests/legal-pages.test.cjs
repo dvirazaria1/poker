@@ -69,8 +69,8 @@ test('privacy.html describes the real data flow: Supabase, Vercel and Google', (
 test('the settings overlay in kupa-sgura.html links to both legal pages, opening in a new tab', () => {
   const kupa = fs.readFileSync('kupa-sgura.html', 'utf8');
   const settings = kupa.slice(
-    kupa.indexOf('<div class="login" id="settings"'),
-    kupa.indexOf('<div class="login" id="groupSettings"')
+    kupa.indexOf('<section class="settings-page" id="settings"'),
+    kupa.indexOf('</section><!-- /#settings -->')
   );
   assert.ok(settings.length > 0, 'the #settings overlay markup should be found');
   assert.match(settings, /<a[^>]+href="\.\/privacy\.html"[^>]*>[^<]*<\/a>/, 'missing a link to privacy.html');

@@ -8,7 +8,7 @@ const appScript = html.slice(html.lastIndexOf('<script>') + '<script>'.length, h
 const between = (start, end) => appScript.slice(appScript.indexOf(start), appScript.indexOf(end, appScript.indexOf(start)));
 
 test('a local account edits its contact details inline: read-only until the pencil, then save or cancel', () => {
-  const settings = html.slice(html.indexOf('<div class="login" id="settings"'), html.indexOf('<div class="login" id="groupSettings"'));
+  const settings = html.slice(html.indexOf('<section class="settings-page" id="settings"'), html.indexOf('</section><!-- /#settings -->'));
   // the values render as text, and the inputs only exist inside a hidden editor
   assert.match(settings, /<p class="set-contact-line" id="setPhoneText" dir="ltr">/);
   assert.match(settings, /<p class="set-contact-line" id="setEmailText" dir="ltr">/);

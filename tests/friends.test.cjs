@@ -198,7 +198,8 @@ test('render routes and controls the standalone friends screen', () => {
   assert.match(html, /document\.body\.classList\.toggle\("friends-view", appView === "friends"\)/);
   assert.match(html, /document\.getElementById\("modeFriends"\)\.classList\.toggle\("on", appView === "friends"\)/);
   assert.match(html, /document\.getElementById\("friendsPage"\)\.hidden = appView !== "friends"/);
-  assert.match(html, /document\.getElementById\("settingsBtn"\)\.hidden = appView !== "profile" && appView !== "games" && appView !== "friends"/);
+  // the gear also stays (lit) on the settings view itself -- see tests/settings-list.test.cjs
+  assert.match(html, /settingsBtn\.hidden = appView !== "profile" && appView !== "games" && appView !== "friends" && appView !== "settings"/);
   assert.match(html, /document\.getElementById\("modeFriends"\)\.addEventListener\("click", \(\) => setAppView\("friends"\)\)/);
 });
 
