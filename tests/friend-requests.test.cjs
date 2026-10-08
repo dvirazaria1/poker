@@ -182,7 +182,7 @@ test('the whole feature is gated by cloudMode()', () => {
   const page = sourceBetween('  function renderFriendsPage()', '  function renderProfile()');
   assert.match(page, /const online = cloudMode\(\);/);
   assert.match(page, /addFriendBtn\.disabled = !online;/);
-  assert.match(page, /if \(!online\) friendsSec\.appendChild\(el\("p", "friend-helper", SERVER_NOTE\)\);/);
+  assert.match(page, /if \(!online\) friendsSec\.appendChild\(el\("p", "friend-helper", ACCOUNT_NOTE\)\);/);
   assert.match(page, /if \(online\) renderAddFriendPanel\(friendsSec\);/);
   // the row actions only exist online
   assert.match(page, /online \? \(i => \{/);

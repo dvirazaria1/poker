@@ -1217,7 +1217,6 @@
     transition: background-color .2s, color .2s, border-color .2s;
   }
   .games-invite-action:hover { border-color: var(--accent); color: var(--accent); }
-  .games-invite-note { margin: 0; color: var(--dim); font-size: 12px; font-weight: 300; max-width: 280px; }
   .games-invite-revoke { color: var(--dim); font-size: 12px; font-weight: 400; padding: 4px 0; transition: color .2s; }
   .games-invite-revoke:hover { color: var(--bad); }
 
@@ -1863,9 +1862,9 @@
   const CONTACT_KEY = "poker-settle-contact";
   const PROFILE_DEBT_SEEN_KEY = "poker-settle-profile-debts-seen";
   const HISTORY_MAX = 400;
-  // One wording for every "not yet, needs a backend" note (design review, row 22): the invite
-  // note, the add-member note, the friends tab helper and the join notice all read this.
-  const SERVER_NOTE = "יעבוד כשהאפליקציה תתחבר לשרת";
+  // Signed-out gates say what to do, never "once the server is connected" -- the app is always
+  // connected (owner, 2026-10-08). The add-member panel and the friends screen read this.
+  const ACCOUNT_NOTE = "יש ליצור קודם חשבון";
   const HOLD_TO_FORCE_CLOSE_MS = 1000;
   const FINISH_GAME_HOLD_MS = 1000;
 
@@ -8480,7 +8479,7 @@
     // Row 32: same shape as the create-group panel — title, full-width field, confirm + cancel.
     content.appendChild(el("h3", "games-section-title", "חבר חדש"));
     content.append(nameInput, submitBtn, cancelBtn);
-    if (!cloudMode()) content.appendChild(el("p", "games-member-add-note", SERVER_NOTE));
+    if (!cloudMode()) content.appendChild(el("p", "games-member-add-note", ACCOUNT_NOTE));
     panelIn.appendChild(content);
     panel.appendChild(panelIn);
 
@@ -8791,8 +8790,6 @@
     // The QR carries the same link as "העתק קישור" — scanning it opens the join notice.
     const qr = qrSvgElement(inviteLink(invite.token, location.origin, location.pathname), 160);
     if (qr) card.appendChild(qr);
-
-    if (!supabase) card.appendChild(el("p", "games-invite-note", SERVER_NOTE));
 
     if (isAdmin) {
       const revokeBtn = el("button", "games-invite-revoke", "בטל הזמנה");
@@ -10481,7 +10478,7 @@
     if (online) addFriendBtn.addEventListener("click", toggleAddFriendPanel);
     friendsSec.appendChild(addFriendBtn);
     if (online) renderAddFriendPanel(friendsSec);
-    if (!online) friendsSec.appendChild(el("p", "friend-helper", SERVER_NOTE));
+    if (!online) friendsSec.appendChild(el("p", "friend-helper", ACCOUNT_NOTE));
     box.appendChild(friendsSec);
   }
 
@@ -12064,7 +12061,7 @@
     ui.group.hidden = !invitedGroup;
 
     if (!supabase) {
-      ui.note.textContent = SERVER_NOTE;
+      ui.note.textContent = "אין חיבור כרגע, נסו שוב בעוד רגע";
       ui.joinBtn.hidden = true;
       ui.continueBtn.hidden = false;
     } else if (!cloudMode()) {

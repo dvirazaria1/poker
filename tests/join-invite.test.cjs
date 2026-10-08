@@ -147,8 +147,9 @@ test('the ?join= query is stripped only by the resolve path, not at boot', () =>
     'boot must not strip the URL before the join flow resolves');
 });
 
-test('the notice keeps the offline copy when supabase is missing', () => {
-  assert.match(joinSource, /SERVER_NOTE/);
+test('with no SDK the notice says the connection is down, never "coming soon"', () => {
+  assert.match(joinSource, /if \(!supabase\) \{\n      ui\.note\.textContent = "אין חיבור כרגע, נסו שוב בעוד רגע";/);
+  assert.doesNotMatch(joinSource, /SERVER_NOTE/);
 });
 
 test('rpc failures are caught, never thrown at the console', () => {

@@ -193,7 +193,7 @@ test('friends are a primary screen and are no longer rendered inside profile', (
   // signed-out screen still shows (see tests/friend-requests.test.cjs for the wiring).
   assert.match(html, /addFriendBtn\.disabled = !online;/);
   assert.match(html, /addFriendBtn\.setAttribute\("aria-disabled", online \? "false" : "true"\);/);
-  assert.match(html, /el\("p", "friend-helper", SERVER_NOTE\)/);
+  assert.match(html, /el\("p", "friend-helper", ACCOUNT_NOTE\)/);
 });
 
 test('render routes and controls the standalone friends screen', () => {

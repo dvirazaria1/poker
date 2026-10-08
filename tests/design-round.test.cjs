@@ -177,14 +177,19 @@ test('the group settings overlay scrolls now that it holds the invite and add-me
   assert.match(rule, /safe-area-inset-bottom/);
 });
 
-test('one shared "יעבוד כשהאפליקציה תתחבר לשרת" constant replaces the four separate wordings', () => {
-  assert.match(html, /const SERVER_NOTE = "יעבוד כשהאפליקציה תתחבר לשרת";/);
+test('no screen says "יעבוד כשהאפליקציה תתחבר לשרת" -- the app is always connected (owner, 2026-10-08)', () => {
+  assert.doesNotMatch(html, /יעבוד כשהאפליקציה תתחבר לשרת/);
+  assert.doesNotMatch(html, /SERVER_NOTE/);
+  assert.match(html, /const ACCOUNT_NOTE = "יש ליצור קודם חשבון";/);
+  // the add-member note and the friends screen are the signed-out gates that read it
+  assert.ok((html.match(/ACCOUNT_NOTE/g) || []).length >= 3);
+  // the invite card's note is gone, CSS included
+  assert.doesNotMatch(html, /games-invite-note/);
+  // the older wordings stay gone too
   assert.doesNotMatch(html, /חיבור חשבונות יגיע עם השרת/);
   assert.doesNotMatch(html, /הצטרפות דרך הזמנה תעבוד כשהאפליקציה תתחבר לשרת/);
   assert.doesNotMatch(html, /הצטרפות תעבוד כשהשרת יחובר/);
   assert.doesNotMatch(html, /דורש חיבור לשרת/);
-  // used by the invite note, the add-member note, the friends helper and the join notice
-  assert.ok((html.match(/SERVER_NOTE/g) || []).length >= 5);
 });
 
 test('the QR placeholder is gone — the invite card now draws a real QR of the link', () => {
