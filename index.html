@@ -584,6 +584,14 @@
   .games-group-action.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
   .games-group-gear { width: 34px; height: 34px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; color: var(--dim); border-radius: 50%; transition: color .2s; }
   .games-group-gear.on { color: var(--accent); }
+  @keyframes gearSpinIn { from { transform: rotate(-180deg); } to { transform: none; } }
+  @keyframes gearSpinOut { from { transform: rotate(180deg); } to { transform: none; } }
+  .games-group-gear.spin-in svg { animation: gearSpinIn .55s cubic-bezier(.2, .8, .2, 1) both; }
+  .games-group-gear.spin-out svg { animation: gearSpinOut .55s cubic-bezier(.2, .8, .2, 1) both; }
+  /* Settings come down from the top of the card (the body clips, so it reads as a pull-down). */
+  @keyframes cardDropIn { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: none; } }
+  .games-group-body-content.drop-in { animation: cardDropIn .32s cubic-bezier(.2, .8, .2, 1) both; }
+  .games-group-view.drop { animation: cardDropIn .28s cubic-bezier(.2, .8, .2, 1) both; }
   .games-group-gear svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .games-group-view { margin-top: 12px; }
   .games-group-view.centered { text-align: center; }
@@ -1437,7 +1445,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 107</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 108</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -6863,13 +6871,16 @@
     head.appendChild(copy);
     // 2026-10-08: settings sit in the open card's corner; the gear swaps the body to settings.
     if (expanded && group.isMember) {
-      const gear = el("button", "games-group-gear" + (expandedGroupMode === "settings" ? " on" : ""));
+      // The gear turns as the card swaps to (or back from) settings; the new body drops in from the top.
+      const spin = groupCardMotion === "settings-in" ? " spin-in" : groupCardMotion === "settings-out" ? " spin-out" : "";
+      const gear = el("button", "games-group-gear" + (expandedGroupMode === "settings" ? " on" : "") + spin);
       gear.type = "button";
       gear.setAttribute("aria-label", "הגדרות קבוצה");
       gear.setAttribute("aria-pressed", String(expandedGroupMode === "settings"));
       gear.innerHTML = GROUP_ACTION_ICONS.settings;
       gear.addEventListener("click", (e) => {
         e.stopPropagation();
+        groupCardMotion = expandedGroupMode === "settings" ? "settings-out" : "settings-in";
         if (expandedGroupMode === "settings") setGroupCardMode("main"); else setGroupCardMode("settings", "details");
       });
       head.appendChild(gear);
@@ -6989,6 +7000,10 @@
     const bodyIn = el("div", "games-group-body-in");
     const content = el("div", "games-group-body-content");
     if (expanded) {
+      if (groupCardMotion === "settings-in" || groupCardMotion === "settings-out") {
+        content.classList.add("drop-in");
+        groupCardMotion = "";
+      }
       if (expandedGroupMode === "details") renderGroupCardDetails(content, group);
       else if (expandedGroupMode === "settings" && group.isMember) renderGroupCardSettings(content, group);
       else renderGroupCardMain(content, group);
@@ -7405,7 +7420,7 @@
     ];
     tiles.push({ key: "roles", icon: "shield", label: "ניהול", onClick: () => setGroupCardTab("roles") });
     content.appendChild(groupTileRow(tiles, tab));
-    const view = el("div", "games-group-view anim" + (tab === "invite" ? " centered" : ""));
+    const view = el("div", "games-group-view drop" + (tab === "invite" ? " centered" : ""));
     if (tab === "invite") {
       const invite = renderGroupInvite(group, activeInvite(state.invites, groupId), group.isAdmin);
       if (invite) view.appendChild(invite);
