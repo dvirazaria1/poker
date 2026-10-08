@@ -888,31 +888,86 @@
   .debt-amount.neg { color: var(--bad); }
   .debt-paid-btn { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 999px; color: var(--dim); font-size: 12px; font-weight: 500; padding: 4px 10px; min-height: 30px; }
   .debt-paid-btn:hover { color: var(--accent); border-color: var(--accent); }
-  .friend-helper { color: var(--dim); font-size: 12px; font-weight: 300; margin-top: 8px; text-align: center; }
-  /* Friends screen empty state (Apple HIG / Material "no contacts yet" pattern, and the same
-     headline+benefit+one-button shape as .login h2/.login-benefit/.btn-primary above): a single
-     headline, one benefit line, then the share-link action as the page's one primary button. No
-     new illustration — the app already reserves the suits mark for the header, not per-screen. */
-  .friends-hero { align-self: stretch; text-align: center; }
-  /* .profile .psection centres its children; the lists must span the column like the debts pane. */
-  .friends-page .debt-group { align-self: stretch; }
-  .friends-page-title { margin-bottom: 4px; }
-  .friends-hero-title { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
-  .friends-hero-benefit { margin: 8px 0 0; color: var(--dim); font-size: 14px; font-weight: 300; }
-  /* Section rhythm matches the dashboard's 24px; the secondary add-by-name path sits closer
-     underneath, quieter, echoing the login screen's primary/.btn-quiet spacing. */
-  .friends-share-btn { margin-top: 24px; }
-  .friends-add-toggle { margin-top: 12px; }
-  /* friend request row actions — a full 44px target inside the flat .debt-row */
-  .friend-action {
-    flex: 0 0 auto; border: 1px solid var(--line); border-radius: 999px; color: var(--dim);
-    font-size: 13px; font-weight: 500; padding: 6px 14px; min-height: 44px;
-    transition: color .18s ease, border-color .18s ease, transform .12s ease;
+  /* Friends screen, 2026-10-08 (owner pick "טבעות דקות", 2 of 8 mockups): a centred title and one
+     lead line like "השולחנות שלך", then quiet rows -- a 34px avatar ring and a name, no dividers,
+     no card. Turquoise marks only what can be acted on: a request waiting on me, "+ הזמן", "אשר".
+     No section animation here: the view's .load-in plays on entry, and rows stagger only then. */
+  .friends-sec { width: 100%; max-width: 380px; margin: 24px auto 0; text-align: start; }
+  .friends-head { text-align: center; margin-bottom: 6px; }
+  .friends-title { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
+  .friends-lead { margin: 6px 0 0; color: var(--dim); font-size: 14px; font-weight: 300; }
+  .friends-label-row { display: flex; align-items: center; gap: 2px; min-height: 44px; margin-top: 14px; }
+  .friends-label { flex: 1 1 auto; margin: 0; color: var(--dim); font-size: 13px; font-weight: 400; }
+  .friends-icon-btn {
+    width: 44px; height: 44px; flex: 0 0 auto; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--dim); transition: color .2s, transform .12s ease;
   }
-  .friend-action:hover { color: var(--text); border-color: var(--dim); }
-  .friend-action:active { transform: scale(.96); }
-  .friend-action.primary { color: var(--accent); border-color: var(--accent); font-weight: 700; }
+  .friends-icon-btn[aria-expanded="true"] { color: var(--accent); }
+  .friends-invite-link {
+    flex: 0 0 auto; min-height: 44px; padding: 8px 4px; color: var(--accent);
+    font-size: 13px; font-weight: 600; transition: color .2s, transform .12s ease;
+  }
+  .friends-search-link {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 6px; margin-top: 10px;
+    color: var(--dim); font-size: 13px; font-weight: 400; transition: color .2s, transform .12s ease;
+  }
+  .friends-icon-btn svg, .friends-search-link svg {
+    width: 18px; height: 18px; fill: none; stroke: currentColor;
+    stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .friends-search-link svg { width: 15px; height: 15px; }
+  .friends-icon-btn:disabled, .friends-invite-link:disabled, .friends-search-link:disabled { color: var(--faint); cursor: default; }
+  .friends-note { margin: 4px 0 0; color: var(--dim); font-size: 12px; font-weight: 300; text-align: center; animation: fadeIn .25s ease; }
+  .friend-row { display: flex; align-items: center; gap: 12px; min-height: 50px; padding: 8px 0; }
+  .friend-name { flex: 1 1 auto; min-width: 0; color: var(--text); font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+  .friend-meta { display: block; color: var(--dim); font-size: 12px; font-weight: 300; }
+  .friend-row.is-outgoing .friend-name { color: var(--dim); }
+  /* The ring. A friend with no picture gets a thin outline and a light initial; a picture, suit or
+     cards keep their own look and only take the ring's edge. Scoped to the row, so the profile and
+     settings avatar is untouched -- and patchAvatars() swaps the node inside the row, so a picture
+     that arrives later is styled the same way. */
+  .friend-row .pavatar { border-color: var(--avatar-ring); }
+  .friend-row .pavatar-initial { background: transparent; color: var(--dim); font-weight: 300; }
+  .friend-row.is-incoming .pavatar { border-color: var(--accent); }
+  .friend-row.is-incoming .pavatar-initial { color: var(--accent); }
+  .friend-row.is-outgoing .pavatar { border-style: dashed; }
+  /* Row actions keep a full 44px target; "אשר" draws its thin pill on an inner span. */
+  .friend-action {
+    flex: 0 0 auto; min-height: 44px; padding: 0 4px; color: var(--dim);
+    font-size: 13px; font-weight: 500; transition: color .18s ease, transform .12s ease;
+  }
+  .friend-action:hover { color: var(--text); }
+  .friend-action.primary { color: var(--accent); font-weight: 700; }
+  .friend-action.primary span { display: inline-block; border: 1px solid var(--accent); border-radius: 999px; padding: 5px 14px; }
+  .friend-action:active, .friends-invite-link:active, .friends-icon-btn:active, .friends-search-link:active { transform: scale(.96); }
+  .friends-invite-link:disabled:active, .friends-icon-btn:disabled:active, .friends-search-link:disabled:active { transform: none; }
   .friend-error { color: var(--bad); font-size: 13px; font-weight: 500; margin: 0; text-align: center; animation: rise .25s ease both; }
+  /* Empty state: three dashed rings stand in for the friends to come -- the row's own ring, not a
+     new illustration (decorative, aria-hidden) -- then the page's one primary action. */
+  .friends-empty { display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .friends-rings { display: flex; justify-content: center; margin: 10px 0 18px; }
+  .friends-rings span {
+    width: 44px; height: 44px; border-radius: 50%; box-sizing: border-box;
+    border: 1px dashed var(--faint); background: var(--bg);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .friends-rings span + span { margin-inline-start: -12px; }
+  .friends-rings .is-add { border-color: var(--accent); color: var(--accent); }
+  .friends-rings.is-off .is-add { border-color: var(--faint); color: var(--faint); }
+  .friends-rings svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+  .friends-empty .friends-lead { max-width: 270px; }
+  .friends-empty .btn-primary { align-self: center; margin-top: 22px; }
+  .friends-empty .btn-primary:disabled { opacity: 1; }
+  /* The search panel reuses .games-create-panel (same 0fr -> 1fr), lighter here: no heading,
+     an underline field, then "שלח בקשה" beside "ביטול". */
+  .friends-sec .games-create-panel { margin-top: 0; align-self: stretch; }
+  .friends-sec .games-create-panel-content { align-items: stretch; gap: 10px; padding: 2px 0 12px; }
+  .friends-sec .games-create-panel-content input[type="text"] { text-align: start; }
+  .friends-empty .games-create-panel-content input[type="text"] { text-align: center; }
+  .friends-panel-actions { display: flex; align-items: center; gap: 16px; }
+  .friends-sec .games-create-submit { font-size: 13px; padding: 8px 20px; }
+  .friends-empty .friends-panel-actions { justify-content: center; }
   .empty-note { color: var(--dim); font-size: 14px; font-weight: 300; margin-top: 10px; }
   .legal-links { color: var(--dim); font-size: 12px; font-weight: 300; margin-top: 8px; }
   .legal-links a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
@@ -1231,7 +1286,6 @@
     transition: background-color .2s, color .2s, border-color .2s;
   }
   .games-invite-action:hover { border-color: var(--accent); color: var(--accent); }
-  .games-invite-note { margin: 0; color: var(--dim); font-size: 12px; font-weight: 300; max-width: 280px; }
   .games-invite-revoke { color: var(--dim); font-size: 12px; font-weight: 400; padding: 4px 0; transition: color .2s; }
   .games-invite-revoke:hover { color: var(--bad); }
 
@@ -1353,6 +1407,7 @@
      accent, the same turquoise-for-red rule as the suits mark in the header. */
   :root {
     --avatar-soft: rgba(234,244,244,.05);
+    --avatar-ring: rgba(234,244,244,.16);
     --avatar-solid: #0A1214;
     --avatar-tint: rgba(53,224,220,.10);
     --avatar-tint-edge: rgba(53,224,220,.35);
@@ -1364,6 +1419,7 @@
   }
   :root[data-theme="light"] {
     --avatar-soft: rgba(12,21,25,.05);
+    --avatar-ring: rgba(12,21,25,.16);
     --avatar-solid: #E8F0F1;
     --avatar-tint: rgba(8,158,152,.10);
     --avatar-tint-edge: rgba(8,158,152,.40);
@@ -1465,7 +1521,6 @@
   .pavatar-edit:hover .pavatar-pencil { color: var(--accent); border-color: var(--accent); }
   .pavatar-pencil svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .pid .pavatar-edit { margin-bottom: 10px; }
-  .friends-page .debt-row .pavatar { margin-inline-end: 2px; }
 
   /* the editor: an overlay above settings, built once per open; selections update in place so
      every colour/border change and the card lift actually transition */
@@ -1880,9 +1935,9 @@
   const CONTACT_KEY = "poker-settle-contact";
   const PROFILE_DEBT_SEEN_KEY = "poker-settle-profile-debts-seen";
   const HISTORY_MAX = 400;
-  // One wording for every "not yet, needs a backend" note (design review, row 22): the invite
-  // note, the add-member note, the friends tab helper and the join notice all read this.
-  const SERVER_NOTE = "יעבוד כשהאפליקציה תתחבר לשרת";
+  // Signed-out gates say what to do, never "once the server is connected" -- the app is always
+  // connected (owner, 2026-10-08). The add-member panel and the friends screen read this.
+  const ACCOUNT_NOTE = "יש ליצור קודם חשבון";
   const HOLD_TO_FORCE_CLOSE_MS = 1000;
   const FINISH_GAME_HOLD_MS = 1000;
 
@@ -1975,6 +2030,8 @@
   let gamesPageEnterNext = false; // dashboard cards should stagger in on the next renderGamesDashboard() —
                                    // set only by setAppView(), never by an in-place re-render (Task 15, same
                                    // pattern as groupPageEnterNext above)
+  let friendsPageEnterNext = false; // friend rows stagger in on the next renderFriendsPage() -- set only by
+                                    // setAppView(), never by an in-place re-render (same as gamesPageEnterNext)
   let cardDetailsJustOpenedId = null; // gameId/historyGameId whose .games-card-details should
                                        // animate its grid-collapse open on the next render (Task 18 motion)
   // friends screen: the inline "הוסף חבר" panel. Draft text, the lookup's in-flight flag and
@@ -6491,6 +6548,7 @@
     animNext = "all";
     groupPageEnterNext = nextView === "group";
     gamesPageEnterNext = nextView === "games";
+    friendsPageEnterNext = nextView === "friends";
     render();
     flashViewEnter(nextView);
   }
@@ -8497,7 +8555,7 @@
     // Row 32: same shape as the create-group panel — title, full-width field, confirm + cancel.
     content.appendChild(el("h3", "games-section-title", "חבר חדש"));
     content.append(nameInput, submitBtn, cancelBtn);
-    if (!cloudMode()) content.appendChild(el("p", "games-member-add-note", SERVER_NOTE));
+    if (!cloudMode()) content.appendChild(el("p", "games-member-add-note", ACCOUNT_NOTE));
     panelIn.appendChild(content);
     panel.appendChild(panelIn);
 
@@ -8808,8 +8866,6 @@
     // The QR carries the same link as "העתק קישור" — scanning it opens the join notice.
     const qr = qrSvgElement(inviteLink(invite.token, location.origin, location.pathname), 160);
     if (qr) card.appendChild(qr);
-
-    if (!supabase) card.appendChild(el("p", "games-invite-note", SERVER_NOTE));
 
     if (isAdmin) {
       const revokeBtn = el("button", "games-invite-revoke", "בטל הזמנה");
@@ -10350,32 +10406,31 @@
     setTimeout(finish, 280);
   }
 
-  // Flat .debt-row-style rows for one friends list (friends / incoming / outgoing).
-  // `actionsFor(index)` returns the row's buttons ([] for the accepted-friends list, which
-  // carries nothing destructive by default). `withAvatars` leads each row with the person's
-  // profile picture (a signed-in friend's comes from their profiles row; anyone else shows the
-  // first letter of the name).
-  function renderFriendGroup(parent, title, refs, metaLabel, actionsFor, withAvatars) {
-    if (!refs.length) return; // an empty list says nothing its missing heading would not
-    const group = el("div", "debt-group");
-    if (title) group.appendChild(el("h3", "", title));
+  // A row action: a full 44px target; the primary one draws its thin pill on an inner span.
+  // Shared by the friends rows and the group page's "זה אני?" rows.
+  function makeFriendActionBtn(action) {
+    const btn = el("button", "friend-action" + (action.primary ? " primary" : ""));
+    btn.type = "button";
+    btn.appendChild(el("span", "", action.label));
+    btn.addEventListener("click", action.onClick);
+    return btn;
+  }
+  // One friends list as quiet rows: a 34px avatar ring, the name, and (online only) the row's
+  // actions. `kind` sets the ring -- "incoming" turquoise (waiting on me), "outgoing" dashed
+  // (waiting on them), "friend" plain; the accepted list passes no actions, nothing destructive.
+  // `enter` is true only on a fresh navigation into the screen, so opening the search panel or
+  // answering a request never replays the stagger (same rule as the dashboard's enterStagger).
+  function renderFriendRows(parent, refs, kind, metaLabel, actionsFor, enter) {
     refs.forEach((ref, i) => {
-      const row = el("div", "debt-row");
-      row.style.animationDelay = (i * 45) + "ms";
-      if (withAvatars) row.appendChild(renderAvatarEl(cachedAvatar(ref.userId), 44, ref.displayName || "", ref.userId || ""));
-      const copy = el("div", "debt-copy");
-      copy.appendChild(el("span", "debt-person", ref.displayName || "משתמש"));
-      if (metaLabel) copy.appendChild(el("span", "debt-meta", metaLabel));
-      row.appendChild(copy);
-      (actionsFor ? actionsFor(i) : []).forEach(action => {
-        const btn = el("button", "friend-action" + (action.primary ? " primary" : ""), action.label);
-        btn.type = "button";
-        btn.addEventListener("click", action.onClick);
-        row.appendChild(btn);
-      });
-      group.appendChild(row);
+      const row = el("div", "friend-row is-" + kind + (enter ? " anim" : ""));
+      if (enter) row.style.animationDelay = (i * 45) + "ms";
+      row.appendChild(renderAvatarEl(cachedAvatar(ref.userId), 34, ref.displayName || "", ref.userId || ""));
+      const name = el("span", "friend-name", ref.displayName || "משתמש");
+      if (metaLabel) name.appendChild(el("span", "friend-meta", metaLabel));
+      row.appendChild(name);
+      (actionsFor ? actionsFor(i) : []).forEach(action => row.appendChild(makeFriendActionBtn(action)));
+      parent.appendChild(row);
     });
-    parent.appendChild(group);
   }
 
   // The inline add-friend panel: same grid-collapse shape as the create-group panel.
@@ -10383,7 +10438,6 @@
     const panel = el("div", "games-create-panel");
     const panelIn = el("div", "games-create-panel-in");
     const content = el("div", "games-create-panel-content");
-    content.appendChild(el("h3", "games-section-title", "חבר חדש"));
 
     const input = document.createElement("input");
     input.type = "text";
@@ -10413,9 +10467,10 @@
     cancelBtn.type = "button";
     cancelBtn.addEventListener("click", closeAddFriendPanel);
 
-    content.append(input, submitBtn);
+    const actions = el("div", "friends-panel-actions");
+    actions.append(submitBtn, cancelBtn);
+    content.append(input, actions);
     if (addFriendError) content.appendChild(el("p", "friend-error", addFriendError));
-    content.appendChild(cancelBtn);
     panelIn.appendChild(content);
     panel.appendChild(panelIn);
 
@@ -10431,75 +10486,112 @@
     parent.appendChild(panel);
   }
 
+  // The invite action's label. `short` is the list heading's "+ הזמן"; the long form is the empty
+  // state's one primary button. Once the link is cached (iOS refused a share sheet that opened
+  // after the first await), the label says the next tap shares straight away.
+  function friendInviteLabel(short) {
+    if (friendInviteSharing) return "יוצר קישור…";
+    const cached = !!(friendInviteLinkCache && authUser && friendInviteLinkCache.userId === authUser.id);
+    if (short) return cached ? "+ שתף קישור" : "+ הזמן";
+    return cached ? "שתף את קישור ההזמנה" : "הזמן חבר בקישור";
+  }
+  // Primary path: share my personal link -- no lookup, no typed name. The link comes from a
+  // server RPC, so without a signed-in session the button stays, faint and disabled.
+  function makeFriendInviteBtn(cls, short, online) {
+    const btn = el("button", cls, friendInviteLabel(short));
+    btn.type = "button";
+    btn.disabled = !online || friendInviteSharing;
+    btn.setAttribute("aria-disabled", online ? "false" : "true");
+    if (online) btn.addEventListener("click", shareFriendInvite);
+    return btn;
+  }
+  // Secondary path: look someone up by exact email or name. In the list heading it is an icon
+  // with an aria-label; in the empty state a quiet text link under the primary button.
+  function makeFriendSearchBtn(cls, online, label) {
+    const btn = el("button", cls);
+    btn.type = "button";
+    btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m20 20-4.2-4.2"></path></svg>';
+    if (label) btn.appendChild(el("span", "", label));
+    else btn.setAttribute("aria-label", "חיפוש לפי שם או מייל");
+    btn.disabled = !online;
+    btn.setAttribute("aria-disabled", online ? "false" : "true");
+    btn.setAttribute("aria-expanded", addFriendOpen ? "true" : "false");
+    if (online) btn.addEventListener("click", toggleAddFriendPanel);
+    return btn;
+  }
+  // No friends and no requests: three dashed rings (decorative), a headline, the benefit line,
+  // then the page's one primary action and the quieter search link beneath it.
+  function renderFriendsEmpty(sec, online) {
+    const wrap = el("div", "friends-empty");
+    const rings = el("div", "friends-rings" + (online ? "" : " is-off"));
+    rings.setAttribute("aria-hidden", "true");
+    rings.innerHTML = '<span></span><span></span><span class="is-add"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"></path></svg></span>';
+    wrap.appendChild(rings);
+    wrap.appendChild(el("h2", "friends-title", "עוד אין חברים"));
+    wrap.appendChild(el("p", "friends-lead", "חברים שמצטרפים דרך קישור זמינים מיד לבחירה בכל משחק וקבוצה."));
+    if (me) wrap.appendChild(makeFriendInviteBtn("btn-primary friends-share-btn", false, online));
+    if (friendInviteShareError) wrap.appendChild(el("p", "friend-error", friendInviteShareError));
+    wrap.appendChild(makeFriendSearchBtn("friends-search-link", online, "חיפוש לפי שם או מייל"));
+    if (online) renderAddFriendPanel(wrap);
+    else wrap.appendChild(el("p", "friends-note", ACCOUNT_NOTE));
+    sec.appendChild(wrap);
+  }
+  // With data: the title, then any request waiting on me (it always needs a decision, so it
+  // leads), then the list heading carrying both add actions, then friends, then requests I sent.
+  function renderFriendsList(sec, data, online, enter) {
+    const head = el("div", "friends-head");
+    head.appendChild(el("h2", "friends-title", "החברים שלך"));
+    head.appendChild(el("p", "friends-lead", "מי שמצטרף זמין לכל משחק וקבוצה"));
+    sec.appendChild(head);
+    const count = data.incoming.length;
+    if (count) {
+      const label = el("div", "friends-label-row");
+      label.appendChild(el("h3", "friends-label", count === 1 ? "בקשה חדשה" : count + " בקשות חדשות"));
+      sec.appendChild(label);
+      renderFriendRows(sec, data.incoming.map(f => f.requester), "incoming", "", online ? (i => {
+        const id = data.incoming[i].id;
+        return [
+          { label: "אשר", primary: true, onClick: () => respondToFriend(id, true) },
+          { label: "דחה", onClick: () => respondToFriend(id, false) },
+        ];
+      }) : null, enter);
+    }
+    const n = data.friends.length;
+    const heading = el("div", "friends-label-row");
+    heading.appendChild(el("h3", "friends-label", n === 0 ? "חברים" : n === 1 ? "חבר אחד" : n + " חברים"));
+    heading.appendChild(makeFriendSearchBtn("friends-icon-btn", online, ""));
+    if (me) heading.appendChild(makeFriendInviteBtn("friends-invite-link", true, online));
+    sec.appendChild(heading);
+    if (friendInviteShareError) sec.appendChild(el("p", "friend-error", friendInviteShareError));
+    if (online) renderAddFriendPanel(sec);
+    else sec.appendChild(el("p", "friends-note", ACCOUNT_NOTE));
+    renderFriendRows(sec, data.friends, "friend", "", null, enter);
+    renderFriendRows(sec, data.outgoing.map(f => f.addressee), "outgoing", "ממתין לאישור", online ? (i => {
+      const id = data.outgoing[i].id;
+      return [{ label: "בטל", onClick: () => withdrawFriendRequest(id) }];
+    }) : null, enter);
+    ensureAvatars(data.friends.concat(data.incoming.map(f => f.requester), data.outgoing.map(f => f.addressee))
+      .map(ref => ref && ref.userId));
+  }
+
   function renderFriendsPage() {
     const box = document.getElementById("friendsPage");
     box.hidden = appView !== "friends";
     if (appView !== "friends") return;
+    const enter = friendsPageEnterNext;
+    friendsPageEnterNext = false;
     box.innerHTML = "";
-
-    // Sending, answering and withdrawing all need a session: without one this is the read-only
-    // screen it has always been — the button stays disabled under the shared server note.
+    // Sending, answering and withdrawing all need a session. Without one the screen keeps its
+    // shape -- the add actions stay, faint and disabled, above ACCOUNT_NOTE.
     const online = cloudMode();
-    const friendsSec = el("section", "psection debt-section");
-    friendsSec.style.animationDelay = ".03s";
+    const sec = el("section", "friends-sec");
     const friendData = me
       ? friendRequestsFor(state.friendships || [], myFriendRef())
       : { friends: [], incoming: [], outgoing: [] };
     const hasFriendData = friendData.friends.length || friendData.incoming.length || friendData.outgoing.length;
-    // Empty state: a real headline, a one-sentence benefit and nothing else competing for
-    // attention — the share-link button just below is the page's one primary action (see the
-    // CSS comment on .friends-hero for the pattern this follows). A request always needs a
-    // decision, so when there is data it leads; the accepted-friends list follows.
-    if (!hasFriendData) {
-      const hero = el("div", "friends-hero");
-      hero.appendChild(el("h2", "friends-hero-title", "עוד אין חברים?"));
-      hero.appendChild(el("p", "friends-hero-benefit", "חברים שמצטרפים דרך קישור זמינים מיד לבחירה בכל משחק וקבוצה."));
-      friendsSec.appendChild(hero);
-    } else {
-      friendsSec.appendChild(el("h2", "friends-hero-title friends-page-title", "החברים שלך"));
-      renderFriendGroup(friendsSec, "בקשות שהתקבלו", friendData.incoming.map(f => f.requester), "ממתין לאישור שלך",
-        online ? (i => {
-          const id = friendData.incoming[i].id;
-          return [
-            { label: "אשר", primary: true, onClick: () => respondToFriend(id, true) },
-            { label: "דחה", onClick: () => respondToFriend(id, false) },
-          ];
-        }) : null, true);
-      renderFriendGroup(friendsSec, "בקשות שנשלחו", friendData.outgoing.map(f => f.addressee), "ממתין לאישור",
-        online ? (i => {
-          const id = friendData.outgoing[i].id;
-          return [{ label: "בטל", onClick: () => withdrawFriendRequest(id) }];
-        }) : null, true);
-      // With no requests pending, the page title already says what this list is.
-      const onlyFriends = !friendData.incoming.length && !friendData.outgoing.length;
-      renderFriendGroup(friendsSec, onlyFriends ? "" : "חברים", friendData.friends, "", null, true);
-      ensureAvatars(friendData.friends.concat(friendData.incoming.map(f => f.requester), friendData.outgoing.map(f => f.addressee))
-        .map(ref => ref && ref.userId));
-    }
-    // Primary path: share my personal link — the frictionless route, no lookup or typed name.
-    // The reverse direction uses a stable server token, so it stays disabled until a signed-in
-    // cloud session can create a redeemable link.
-    if (me) {
-      const inviteMeBtn = el("button", "btn-primary friends-share-btn", friendInviteSharing ? "יוצר קישור…"
-        : (friendInviteLinkCache && authUser && friendInviteLinkCache.userId === authUser.id ? "שתף את קישור ההזמנה" : "צור קישור הזמנה"));
-      inviteMeBtn.type = "button";
-      inviteMeBtn.disabled = !online || friendInviteSharing;
-      if (online) inviteMeBtn.addEventListener("click", shareFriendInvite);
-      friendsSec.appendChild(inviteMeBtn);
-      if (friendInviteShareError) friendsSec.appendChild(el("p", "friend-error", friendInviteShareError));
-    }
-    // Secondary path: look someone up by exact email or name — quieter, same shape as the
-    // login screen's "המשך בלי חשבון": a real, bordered, 44px action, just not the lead one.
-    const addFriendBtn = el("button", "btn-quiet friends-add-toggle", "חפש לפי שם או מייל");
-    addFriendBtn.type = "button";
-    addFriendBtn.disabled = !online;
-    addFriendBtn.setAttribute("aria-disabled", online ? "false" : "true");
-    addFriendBtn.setAttribute("aria-expanded", addFriendOpen ? "true" : "false");
-    if (online) addFriendBtn.addEventListener("click", toggleAddFriendPanel);
-    friendsSec.appendChild(addFriendBtn);
-    if (online) renderAddFriendPanel(friendsSec);
-    if (!online) friendsSec.appendChild(el("p", "friend-helper", SERVER_NOTE));
-    box.appendChild(friendsSec);
+    if (hasFriendData) renderFriendsList(sec, friendData, online, enter);
+    else renderFriendsEmpty(sec, online);
+    box.appendChild(sec);
   }
 
   function renderProfile() {
@@ -12081,7 +12173,7 @@
     ui.group.hidden = !invitedGroup;
 
     if (!supabase) {
-      ui.note.textContent = SERVER_NOTE;
+      ui.note.textContent = "אין חיבור כרגע, נסו שוב בעוד רגע";
       ui.joinBtn.hidden = true;
       ui.continueBtn.hidden = false;
     } else if (!cloudMode()) {
@@ -12386,8 +12478,8 @@
 
   // The group-page section: a calm "שיחקת כאן בעבר?" row per same-name unlinked guest in this
   // group. Returns null when there is nothing to show, so renderGroupPage() only appends and
-  // stagger-animates it when it is not empty. Reuses renderFriendGroup (the friend-request rows)
-  // rather than a new component.
+  // stagger-animates it when it is not empty. Flat .debt-row rows with the friends screen's row
+  // actions (makeFriendActionBtn) rather than a new component.
   function renderGroupGuestClaims(groupId) {
     if (!cloudMode() || !authUser) return null;
     const candidates = guestClaimCandidatesInGroup(cloudGuestRows, state.groupMembers, groupId, authUser.id, me)
@@ -12395,11 +12487,19 @@
     if (!candidates.length) return null;
     const section = el("section", "games-section");
     if (guestClaimError) section.appendChild(el("p", "friend-error", guestClaimError));
-    const refs = candidates.map(g => ({ displayName: "שיחקת כאן בעבר בשם " + g.display_name + "?" }));
-    renderFriendGroup(section, "זה אני?", refs, "", i => [
-      { label: "זה אני", primary: true, onClick: () => selfClaimGuest(candidates[i].id) },
-      { label: "לא", onClick: () => dismissGuestClaimCandidate(candidates[i].id) },
-    ]);
+    const group = el("div", "debt-group");
+    group.appendChild(el("h3", "", "זה אני?"));
+    candidates.forEach((g, i) => {
+      const row = el("div", "debt-row");
+      row.style.animationDelay = (i * 45) + "ms";
+      const copy = el("div", "debt-copy");
+      copy.appendChild(el("span", "debt-person", "שיחקת כאן בעבר בשם " + g.display_name + "?"));
+      row.appendChild(copy);
+      row.appendChild(makeFriendActionBtn({ label: "זה אני", primary: true, onClick: () => selfClaimGuest(g.id) }));
+      row.appendChild(makeFriendActionBtn({ label: "לא", onClick: () => dismissGuestClaimCandidate(g.id) }));
+      group.appendChild(row);
+    });
+    section.appendChild(group);
     return section;
   }
 
