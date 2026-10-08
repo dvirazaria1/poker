@@ -157,7 +157,9 @@ test('mode and tab changes turn the card like a page: side by side in a clipped 
   assert.match(src, /turnGroupCardPage\(\[".games-group-body-content"\], \{ axis: "y", forward: mode === "settings" \}\);/);
   // statistics: the tile under the thumb stays; only the rest of its row and the content below turn
   assert.match(src, /turnGroupCardPage\(\[".games-group-row-rest", ".games-group-below"\], \{ axis: "x", forward: mode === "details" \}\);/);
-  assert.match(src, /turnGroupCardPage\(\[".games-group-view"\], \{ axis: expandedGroupMode === "settings" \? "y" : "x", forward: true \}\);/);
+  // settings tabs: the new view enters from the side of the tab tapped; statistics tabs leftwards
+  assert.match(src, /turnGroupCardPage\(\[".games-group-view"\], \{ axis: "x", forward: order\.indexOf\(tab\) < order\.indexOf\(current\) \}\);/);
+  assert.match(src, /turnGroupCardPage\(\[".games-group-view"\], \{ axis: "x", forward: true \}\);/);
   assert.match(src, /fromMove = turn\.forward \? "translateX\(0\)" : "translateX\(-100%\)";/);
   assert.match(src, /toMove = turn\.forward \? "translateX\(-100%\)" : "translateX\(0\)";/);
   assert.match(src, /clip\.animate\(\[\{ height: fromHeight \+ "px" \}, \{ height: toHeight \+ "px" \}\]/);
