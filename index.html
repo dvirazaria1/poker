@@ -1145,12 +1145,6 @@
   .back-arrow svg { width: 26px; height: 26px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .back-arrow:hover { color: var(--accent); }
   .set-in { align-items: center; text-align: center; gap: 20px; }
-  .avatar {
-    width: 84px; height: 84px; border-radius: 50%;
-    background: var(--accent); color: var(--bg);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 38px; font-weight: 800;
-  }
   .set-name-row { display: flex; align-items: center; justify-content: center; margin-top: -6px; }
   .set-name { font-size: 22px; font-weight: 800; }
   .set-name-edit {
@@ -1345,6 +1339,156 @@
   .push-prompt-later:hover { color: var(--text); }
   .push-prompt-error { margin: 10px 0 0; font-size: 12px; color: var(--bad); }
 
+  /* ---------- profile avatar: one renderer for photo / suit (4 styles) / 1-2 cards, any size ----------
+     Geometry that depends on the size (glyph, card faces, chip edge) is set inline by
+     renderAvatarEl; everything colour-related lives here so both themes come from tokens.
+     Card faces stay light in both themes, like real cards; hearts and diamonds use the darker
+     accent, the same turquoise-for-red rule as the suits mark in the header. */
+  :root {
+    --avatar-soft: rgba(234,244,244,.05);
+    --avatar-solid: #0A1214;
+    --avatar-tint: rgba(53,224,220,.10);
+    --avatar-tint-edge: rgba(53,224,220,.35);
+    --card-face: #EAF4F4;
+    --card-back: #AEBDC0;
+    --card-ink: #05070A;
+    --card-red: #089E98;
+    --card-shadow: 0 1px 4px rgba(0,0,0,.45);
+  }
+  :root[data-theme="light"] {
+    --avatar-soft: rgba(12,21,25,.05);
+    --avatar-solid: #E8F0F1;
+    --avatar-tint: rgba(8,158,152,.10);
+    --avatar-tint-edge: rgba(8,158,152,.40);
+    --card-face: #FFFFFF;
+    --card-back: #C9D4D7;
+    --card-shadow: 0 1px 4px rgba(12,21,25,.22);
+  }
+  .pavatar {
+    position: relative; flex: 0 0 auto; box-sizing: border-box;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 50%; overflow: hidden; direction: ltr;
+    background: var(--avatar-soft); border: 1px solid var(--line);
+    color: var(--text); line-height: 1; user-select: none; -webkit-user-select: none;
+  }
+  .pavatar-initial { font-weight: 800; }
+  .pavatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pavatar-photo { background: var(--avatar-solid); }
+  .pavatar-silhouette { width: 72%; height: 72%; align-self: flex-end; fill: var(--faint); }
+  .pavatar svg.pavatar-glyph { overflow: visible; }
+  .pavatar .glyph-back { fill: var(--text); }
+  .pavatar .glyph-front { fill: none; }
+  .pavatar.accent { background: var(--avatar-tint); border-color: var(--avatar-tint-edge); }
+  .pavatar.accent .glyph-back { fill: var(--accent); }
+  /* "קו": a thick accent glyph covered by the same glyph in the circle's own colour -- only the
+     outer contour shows, so the club's three lobes read as one outline with no inner seams. */
+  .pavatar.outline { background: var(--avatar-solid); border-color: var(--avatar-tint-edge); }
+  .pavatar.outline .glyph-back { fill: var(--accent); stroke: var(--accent); stroke-width: 3.4; stroke-linejoin: round; }
+  .pavatar.outline .glyph-front { fill: var(--avatar-solid); }
+  .pavatar.chip { background: var(--avatar-solid); border-style: dashed; border-color: var(--accent); }
+  .pavatar-chip-ring { position: absolute; inset: 16%; border-radius: 50%; border: 1px solid var(--avatar-tint-edge); }
+  .pavatar-card {
+    position: absolute; box-sizing: border-box;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--card-face); color: var(--card-ink); box-shadow: var(--card-shadow);
+  }
+  .pavatar-card.red { color: var(--card-red); }
+  .pavatar-card.blank { background: var(--card-back); }
+  .pavatar-card b { font-weight: 800; line-height: 1; letter-spacing: -.02em; }
+  .pavatar-card i { font-style: normal; line-height: 1; }
+  /* tap-to-edit wrapper (profile header, settings): the avatar plus a pencil badge */
+  .pavatar-edit { position: relative; display: inline-flex; border-radius: 50%; transition: transform .12s ease; }
+  .pavatar-edit:active { transform: scale(.94); }
+  .pavatar-pencil {
+    position: absolute; inset-block-end: -2px; inset-inline-start: -2px;
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg); border: 1px solid var(--line); color: var(--text);
+    transition: color .2s ease, border-color .2s ease;
+  }
+  .pavatar-edit:hover .pavatar-pencil { color: var(--accent); border-color: var(--accent); }
+  .pavatar-pencil svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .pid .pavatar-edit { margin-bottom: 10px; }
+  .friends-page .debt-row .pavatar { margin-inline-end: 2px; }
+
+  /* the editor: an overlay above settings, built once per open; selections update in place so
+     every colour/border change and the card lift actually transition */
+  #avatarEditor {
+    z-index: 44; align-items: flex-start; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+  .avatar-editor-in { width: 100%; max-width: 380px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; animation: rise .3s ease both; }
+  .avatar-editor-head { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+  .avatar-editor-head .back-arrow { position: static; margin-inline-start: -8px; }
+  .avatar-editor-head h2 { margin: 0; font-size: 17px; font-weight: 700; }
+  .avatar-editor-head-spacer { width: 42px; }
+  .avatar-editor-preview { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .avatar-editor-name { font-size: 20px; font-weight: 800; }
+  .avatar-seg {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;
+    padding: 4px; border-radius: 999px; border: 1px solid var(--line);
+  }
+  .avatar-seg button {
+    min-height: 42px; border-radius: 999px; font-size: 14px; color: var(--dim);
+    transition: background-color .2s ease, color .2s ease, transform .12s ease;
+  }
+  .avatar-seg button.on { background: var(--text); color: var(--bg); font-weight: 700; }
+  .avatar-seg button:active { transform: scale(.96); }
+  .avatar-panel { display: flex; flex-direction: column; gap: 14px; }
+  .avatar-panel.avatar-panel-in { animation: rise .28s ease both; }
+  .avatar-label { margin: 0; font-size: 13px; font-weight: 500; color: var(--dim); letter-spacing: .04em; }
+  .avatar-hint { margin: 0; font-size: 12px; font-weight: 300; color: var(--dim); text-align: center; }
+  .avatar-grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .avatar-grid7 { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .avatar-suit-btn {
+    min-height: 54px; border-radius: 16px; border: 1px solid var(--line); color: var(--faint);
+    display: flex; align-items: center; justify-content: center;
+    transition: color .2s ease, border-color .2s ease, transform .12s ease;
+  }
+  .avatar-suit-btn svg { width: 28px; height: 28px; fill: currentColor; }
+  .avatar-suit-btn.on { color: var(--text); border-color: var(--text); }
+  .avatar-suit-btn:active, .avatar-style-btn:active, .avatar-pick:active { transform: scale(.92); }
+  .avatar-style-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 0 8px;
+    border-radius: 18px; border: 1px solid var(--line); font-size: 12px; color: var(--dim);
+    transition: border-color .2s ease, background-color .2s ease, color .2s ease, transform .12s ease;
+  }
+  .avatar-style-btn.on { border-color: var(--accent); background: var(--avatar-tint); color: var(--text); font-weight: 700; }
+  .avatar-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; text-align: start; }
+  .avatar-switch-row > span:first-child { display: flex; flex-direction: column; gap: 1px; }
+  .avatar-switch-title { font-size: 15px; font-weight: 700; color: var(--text); }
+  .avatar-switch-sub { font-size: 12px; font-weight: 300; color: var(--dim); }
+  .avatar-cards { display: flex; justify-content: center; gap: 16px; padding-top: 8px; direction: ltr; }
+  .avatar-card-btn {
+    width: 58px; height: 82px; border-radius: 9px; gap: 4px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--card-face); color: var(--card-ink); box-shadow: var(--card-shadow);
+    opacity: .7; transition: transform .2s ease, opacity .2s ease, box-shadow .2s ease;
+  }
+  .avatar-card-btn.red { color: var(--card-red); }
+  .avatar-card-btn.on { opacity: 1; transform: translateY(-6px); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+  .avatar-card-btn b { font-size: 22px; font-weight: 800; line-height: 1; }
+  .avatar-card-btn i { font-size: 20px; font-style: normal; line-height: 1; }
+  .avatar-pick {
+    min-height: 44px; border-radius: 12px; border: 1px solid var(--line);
+    font-size: 15px; color: var(--dim); direction: ltr;
+    transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .12s ease;
+  }
+  .avatar-pick.suit { font-size: 20px; }
+  .avatar-pick.on { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--bg); font-weight: 800; }
+  .avatar-photo-btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px;
+    border-radius: 999px; border: 1px solid var(--accent); color: var(--accent);
+    font-size: 15px; font-weight: 700; cursor: pointer; transition: transform .12s ease, opacity .2s ease;
+  }
+  .avatar-photo-btn:active { transform: scale(.97); }
+  .avatar-photo-btn.busy { opacity: .55; pointer-events: none; }
+  .avatar-photo-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .avatar-photo-btn input { display: none; }
+  .avatar-remove { align-self: center; min-height: 44px; padding: 0 16px; font-size: 13px; color: var(--bad); }
+  .avatar-error { margin: 0; font-size: 13px; color: var(--bad); text-align: center; animation: fadeIn .25s ease both; }
+  .avatar-save { width: 100%; align-self: stretch; margin-top: 4px; }
+
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
   }
@@ -1368,12 +1512,15 @@
   </button>
 </div>
 
+<!-- profile picture editor: content is built by openAvatarEditor() -->
+<div class="login" id="avatarEditor" role="dialog" aria-modal="true" aria-labelledby="avatarEditorTitle" hidden></div>
+
 <div class="login" id="settings" hidden>
   <button type="button" class="back-arrow" id="setBackBtn" aria-label="חזרה">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg>
   </button>
   <div class="login-in set-in">
-    <div class="avatar" id="setAvatar">?</div>
+    <button type="button" class="pavatar-edit" id="setAvatar" aria-label="עריכת תמונת הפרופיל"></button>
     <div class="set-name-row">
       <div class="set-name" id="setName"></div>
       <button type="button" class="set-name-edit" id="setNameEdit" aria-label="עריכת השם">
@@ -1441,7 +1588,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 115</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 116</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -3563,6 +3710,42 @@
     if (!value) return { kind: "empty", value: "" };
     if (value.indexOf("@") >= 0) return { kind: "email", value: value.toLowerCase() };
     return { kind: "name", value };
+  }
+
+  // ---------- profile avatar (pure) ----------
+  // A profile picture is one of three things, kept as ONE string in profiles.avatar_url (and, for
+  // this device, in the contact store) so the server needs no new column:
+  //   a photo  -> a downscaled "data:image/jpeg;base64,..." (the client shrinks it first)
+  //   a suit   -> "kupa:suit:<spade|heart|diamond|club>:<plain|accent|outline|chip>"
+  //   cards    -> "kupa:cards:As" or "kupa:cards:As.Kh" (rank A K Q J 10 9..2, suit s h d c)
+  // Anything else -- including another person's value that fails these exact shapes -- parses to
+  // null and renders as the name's first letter, so a foreign string never reaches an <img src>.
+  function parseAvatar(token) {
+    if (typeof token !== "string" || !token || token.length > 32000) return null;
+    if (/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(token)) return { kind: "photo", photo: token };
+    const suit = /^kupa:suit:(spade|heart|diamond|club):(plain|accent|outline|chip)$/.exec(token);
+    if (suit) return { kind: "suit", suit: suit[1], style: suit[2] };
+    const card = "(?:A|K|Q|J|10|[2-9])[shdc]";
+    const cards = new RegExp("^kupa:cards:(" + card + ")(?:\\.(" + card + "))?$").exec(token);
+    if (!cards) return null;
+    const suitOf = { s: "spade", h: "heart", d: "diamond", c: "club" };
+    return {
+      kind: "cards",
+      cards: [cards[1], cards[2]].filter(Boolean).map(code => ({ rank: code.slice(0, -1), suit: suitOf[code.slice(-1)] })),
+    };
+  }
+  // The inverse; null for anything parseAvatar would reject, so an incomplete draft (photo mode
+  // with no photo picked yet) can never be saved.
+  function formatAvatar(avatar) {
+    const a = avatar || {};
+    let token = null;
+    if (a.kind === "photo") token = typeof a.photo === "string" ? a.photo : null;
+    else if (a.kind === "suit") token = "kupa:suit:" + a.suit + ":" + a.style;
+    else if (a.kind === "cards" && Array.isArray(a.cards) && (a.cards.length === 1 || a.cards.length === 2)) {
+      const code = { spade: "s", heart: "h", diamond: "d", club: "c" };
+      token = "kupa:cards:" + a.cards.map(c => (c && c.rank) + (c && code[c.suit])).join(".");
+    }
+    return token && parseAvatar(token) ? token : null;
   }
 
   // ---------- player exit (pure) ----------
@@ -10112,14 +10295,17 @@
 
   // Flat .debt-row-style rows for one friends list (friends / incoming / outgoing).
   // `actionsFor(index)` returns the row's buttons ([] for the accepted-friends list, which
-  // carries nothing destructive by default).
-  function renderFriendGroup(parent, title, refs, metaLabel, actionsFor) {
+  // carries nothing destructive by default). `withAvatars` leads each row with the person's
+  // profile picture (a signed-in friend's comes from their profiles row; anyone else shows the
+  // first letter of the name).
+  function renderFriendGroup(parent, title, refs, metaLabel, actionsFor, withAvatars) {
     if (!refs.length) return; // an empty list says nothing its missing heading would not
     const group = el("div", "debt-group");
     if (title) group.appendChild(el("h3", "", title));
     refs.forEach((ref, i) => {
       const row = el("div", "debt-row");
       row.style.animationDelay = (i * 45) + "ms";
+      if (withAvatars) row.appendChild(renderAvatarEl(cachedAvatar(ref.userId), 44, ref.displayName || "", ref.userId || ""));
       const copy = el("div", "debt-copy");
       copy.appendChild(el("span", "debt-person", ref.displayName || "משתמש"));
       if (metaLabel) copy.appendChild(el("span", "debt-meta", metaLabel));
@@ -10221,15 +10407,17 @@
             { label: "אשר", primary: true, onClick: () => respondToFriend(id, true) },
             { label: "דחה", onClick: () => respondToFriend(id, false) },
           ];
-        }) : null);
+        }) : null, true);
       renderFriendGroup(friendsSec, "בקשות שנשלחו", friendData.outgoing.map(f => f.addressee), "ממתין לאישור",
         online ? (i => {
           const id = friendData.outgoing[i].id;
           return [{ label: "בטל", onClick: () => withdrawFriendRequest(id) }];
-        }) : null);
+        }) : null, true);
       // With no requests pending, the page title already says what this list is.
       const onlyFriends = !friendData.incoming.length && !friendData.outgoing.length;
-      renderFriendGroup(friendsSec, onlyFriends ? "" : "חברים", friendData.friends, "");
+      renderFriendGroup(friendsSec, onlyFriends ? "" : "חברים", friendData.friends, "", null, true);
+      ensureAvatars(friendData.friends.concat(friendData.incoming.map(f => f.requester), friendData.outgoing.map(f => f.addressee))
+        .map(ref => ref && ref.userId));
     }
     // Primary path: share my personal link — the frictionless route, no lookup or typed name.
     // The reverse direction uses a stable server token, so it stays disabled until a signed-in
@@ -10293,6 +10481,12 @@
 
     // identity
     const idSec = el("section", "psection pid");
+    const idAvatar = el("button", "pavatar-edit");
+    idAvatar.type = "button";
+    idAvatar.setAttribute("aria-label", "עריכת תמונת הפרופיל");
+    idAvatar.addEventListener("click", openAvatarEditor);
+    mountMyAvatar(idAvatar, 76);
+    idSec.appendChild(idAvatar);
     const idName = el("div", "pname-big", me);
     idSec.appendChild(idName);
     const tabs = el("div", "profile-tabs");
@@ -10701,6 +10895,524 @@
     setAppView("games");
   });
 
+  // ---------- profile avatar (UI) ----------
+  // Drawn on a 24x24 viewBox. The club is three lobes, a centre disc and a stem as separate
+  // subpaths with one winding direction, so it fills as one shape.
+  const AVATAR_SUIT_PATHS = {
+    spade: "M12 2.6C12 2.6 3 9.4 3 14.3C3 17 5.1 18.8 7.5 18.8C9.1 18.8 10.4 18 11.2 16.9C11.1 18.9 10.3 20.4 9 21.4H15C13.7 20.4 12.9 18.9 12.8 16.9C13.6 18 14.9 18.8 16.5 18.8C18.9 18.8 21 17 21 14.3C21 9.4 12 2.6 12 2.6Z",
+    heart: "M12 20.6C12 20.6 2.8 14.7 2.8 9C2.8 6.1 5 4 7.6 4C9.5 4 11.1 5.1 12 6.6C12.9 5.1 14.5 4 16.4 4C19 4 21.2 6.1 21.2 9C21.2 14.7 12 20.6 12 20.6Z",
+    diamond: "M12 2.2L20.6 12L12 21.8L3.4 12Z",
+    club: "M8.3 6.8a3.7 3.7 0 1 1 7.4 0a3.7 3.7 0 1 1-7.4 0ZM3.2 13.4a3.7 3.7 0 1 1 7.4 0a3.7 3.7 0 1 1-7.4 0ZM13.4 13.4a3.7 3.7 0 1 1 7.4 0a3.7 3.7 0 1 1-7.4 0ZM9.6 12a2.4 2.4 0 1 1 4.8 0a2.4 2.4 0 1 1-4.8 0ZM12.9 13.6C12.9 16.8 13.7 19.7 15.1 21.4H8.9C10.3 19.7 11.1 16.8 11.1 13.6Z",
+  };
+  const AVATAR_SUITS = ["spade", "heart", "diamond", "club"];
+  const AVATAR_SUIT_NAMES = { spade: "עלה", heart: "לב", diamond: "יהלום", club: "תלתן" };
+  // U+FE0E keeps iOS from swapping the suit characters for colour emoji.
+  const AVATAR_SUIT_GLYPHS = { spade: "♠︎", heart: "♥︎", diamond: "♦︎", club: "♣︎" };
+  const AVATAR_STYLES = [["plain", "נקי"], ["accent", "טורקיז"], ["outline", "קו"], ["chip", "צ׳יפ"]];
+  const AVATAR_RANKS = ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"];
+  const AVATAR_PHOTO_BUDGET = 24000; // data-URL chars; a 192px JPEG usually lands at 8-14k
+  const AVATAR_TTL_MS = 5 * 60 * 1000;
+  // Other people's pictures, profileId -> { token, at }. Memory only (no new storage key); RLS
+  // lets me read the profiles of my friends and group-mates and nobody else.
+  const avatarCache = new Map();
+  const avatarInflight = new Set();
+  let avatarRetryAfter = 0;
+  let avatarDraft = null;    // the editor's UI-only draft, alive between open and close
+  let avatarEditorUi = null; // the editor's live elements, built once per open
+
+  function svgEl(tag, attrs) {
+    const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    Object.keys(attrs || {}).forEach(k => node.setAttribute(k, attrs[k]));
+    return node;
+  }
+  function isRedSuit(suit) { return suit === "heart" || suit === "diamond"; }
+  function cachedAvatar(profileId) {
+    return profileId && avatarCache.has(profileId) ? avatarCache.get(profileId).token : null;
+  }
+  // Mine: the server copy once fetched, else the copy this device saved for this same account
+  // (or, with no account, the device-only one -- avatarFor null).
+  function myAvatarToken() {
+    const owner = authUser ? authUser.id : null;
+    if (owner && avatarCache.has(owner)) return avatarCache.get(owner).token;
+    const c = loadContact();
+    return (c.avatarFor || null) === owner && parseAvatar(c.avatar) ? c.avatar : null;
+  }
+  function storeMyAvatarLocally(token) {
+    writeContact({ avatar: token || null, avatarFor: authUser ? authUser.id : null });
+  }
+
+  // One avatar circle of `size` px. Built with DOM calls only; a photo reaches <img src> only
+  // after parseAvatar accepted it as a base64 image. `key` ("me" or a profile id) lets a later
+  // fetch swap this exact node in place (patchAvatars) instead of re-rendering the whole screen.
+  function renderAvatarEl(token, size, name, key) {
+    const a = parseAvatar(token);
+    const box = el("span", "pavatar");
+    box.style.width = box.style.height = size + "px";
+    box.setAttribute("aria-hidden", "true");
+    if (key) {
+      box.dataset.avatarKey = key;
+      box.dataset.avatarSize = String(size);
+      box.dataset.avatarName = name || "";
+    }
+    if (!a) {
+      box.classList.add("pavatar-initial");
+      box.style.fontSize = Math.round(size * 0.42) + "px";
+      box.textContent = String(name || "").trim().charAt(0) || "?";
+      return box;
+    }
+    if (a.kind === "photo") {
+      box.classList.add("pavatar-photo");
+      const img = document.createElement("img");
+      img.alt = "";
+      img.decoding = "async";
+      img.src = a.photo;
+      box.appendChild(img);
+      return box;
+    }
+    if (a.kind === "suit") {
+      if (a.style !== "plain") box.classList.add(a.style);
+      if (a.style === "chip") {
+        box.style.borderWidth = Math.max(2, size * 0.075).toFixed(1) + "px";
+        box.appendChild(el("span", "pavatar-chip-ring"));
+      }
+      const g = ((a.style === "chip" ? 0.40 : a.style === "outline" ? 0.46 : 0.48) * size).toFixed(1);
+      const svg = svgEl("svg", { viewBox: "0 0 24 24", class: "pavatar-glyph", width: g, height: g });
+      svg.style.position = "relative";
+      svg.appendChild(svgEl("path", { d: AVATAR_SUIT_PATHS[a.suit], class: "glyph-back" }));
+      svg.appendChild(svgEl("path", { d: AVATAR_SUIT_PATHS[a.suit], class: "glyph-front" }));
+      box.appendChild(svg);
+      return box;
+    }
+    // cards: one card upright; two cards fanned like a held hand. Below 56px a fan no longer
+    // reads, so the first card comes to the front and the second only peeks out behind it.
+    const mid = size / 2;
+    const face = (card, w, h, cx, cy, rot, rankPx, suitPx, blank) => {
+      const f = el("span", "pavatar-card" + (blank ? " blank" : isRedSuit(card.suit) ? " red" : ""));
+      f.style.left = (cx - w / 2).toFixed(1) + "px";
+      f.style.top = (cy - h / 2).toFixed(1) + "px";
+      f.style.width = w.toFixed(1) + "px";
+      f.style.height = h.toFixed(1) + "px";
+      f.style.borderRadius = Math.max(2, w * 0.14).toFixed(1) + "px";
+      f.style.transform = "rotate(" + rot + "deg)";
+      if (!blank) {
+        const rank = el("b", "", card.rank);
+        rank.style.fontSize = rankPx.toFixed(1) + "px";
+        const suit = el("i", "", AVATAR_SUIT_GLYPHS[card.suit]);
+        suit.style.fontSize = suitPx.toFixed(1) + "px";
+        f.append(rank, suit);
+      }
+      box.appendChild(f);
+    };
+    const [first, second] = a.cards;
+    if (!second) {
+      face(first, size * 0.44, size * 0.62, mid, mid, 0, size * 0.22, size * 0.19, false);
+    } else if (size >= 56) {
+      face(first, size * 0.38, size * 0.54, mid - size * 0.13, mid + size * 0.02, -10, size * 0.17, size * 0.15, false);
+      face(second, size * 0.38, size * 0.54, mid + size * 0.13, mid + size * 0.02, 10, size * 0.17, size * 0.15, false);
+    } else {
+      face(second, size * 0.44, size * 0.62, mid + size * 0.12, mid, 14, 0, 0, true);
+      face(first, size * 0.44, size * 0.62, mid - size * 0.04, mid, -4, size * 0.22, size * 0.19, false);
+    }
+    return box;
+  }
+  // Photo mode before a photo is picked: a silhouette, so the preview never shows a letter that
+  // the saved avatar would not.
+  function renderEmptyPhotoAvatar(size) {
+    const box = el("span", "pavatar pavatar-photo");
+    box.style.width = box.style.height = size + "px";
+    box.setAttribute("aria-hidden", "true");
+    const svg = svgEl("svg", { viewBox: "0 0 24 24", class: "pavatar-silhouette" });
+    svg.appendChild(svgEl("circle", { cx: "12", cy: "9.2", r: "4.3" }));
+    svg.appendChild(svgEl("path", { d: "M3.4 24.5C4.3 19 7.7 16 12 16S19.7 19 20.6 24.5Z" }));
+    box.appendChild(svg);
+    return box;
+  }
+  function avatarPencil() {
+    const badge = el("span", "pavatar-pencil");
+    badge.setAttribute("aria-hidden", "true");
+    const svg = svgEl("svg", { viewBox: "0 0 24 24" });
+    svg.appendChild(svgEl("path", { d: "M4 20h4l10.5-10.5a2.83 2.83 0 0 0-4-4L4 16v4Z" }));
+    svg.appendChild(svgEl("path", { d: "m13.5 6.5 4 4" }));
+    badge.appendChild(svg);
+    return badge;
+  }
+  // Fills a tap-to-edit button (profile header, settings) with my avatar plus the pencil badge.
+  function mountMyAvatar(button, size) {
+    button.textContent = "";
+    button.append(renderAvatarEl(myAvatarToken(), size, me || "", "me"), avatarPencil());
+    if (authUser) ensureAvatars([authUser.id]);
+  }
+  function patchAvatars(key) {
+    const token = key === "me" ? myAvatarToken() : cachedAvatar(key);
+    document.querySelectorAll('.pavatar[data-avatar-key="' + CSS.escape(key) + '"]').forEach(old => {
+      old.replaceWith(renderAvatarEl(token, Number(old.dataset.avatarSize) || 44, old.dataset.avatarName, key));
+    });
+  }
+  // Fetches the pictures of these profiles that are missing or older than AVATAR_TTL_MS, in one
+  // query, and swaps every rendered node that changed. A failed query backs off for 30s rather
+  // than retrying on every render.
+  function ensureAvatars(ids) {
+    if (!supabase || !authUser) return;
+    if (Date.now() < avatarRetryAfter) return;
+    const now = Date.now();
+    const want = Array.from(new Set(ids || [])).filter(id => isCloudId(id) && !avatarInflight.has(id)
+      && (!avatarCache.has(id) || now - avatarCache.get(id).at > AVATAR_TTL_MS));
+    if (!want.length) return;
+    want.forEach(id => avatarInflight.add(id));
+    const failed = () => {
+      want.forEach(id => avatarInflight.delete(id));
+      avatarRetryAfter = Date.now() + 30000;
+    };
+    supabase.from("profiles").select("id,avatar_url").in("id", want).then(({ data, error }) => {
+      if (error) { failed(); return; }
+      want.forEach(id => avatarInflight.delete(id));
+      const found = {};
+      (data || []).forEach(row => { if (row && row.id) found[String(row.id)] = row.avatar_url; });
+      want.forEach(id => {
+        const token = parseAvatar(found[id]) ? found[id] : null;
+        const known = avatarCache.has(id);
+        const before = known ? avatarCache.get(id).token : null;
+        avatarCache.set(id, { token, at: Date.now() });
+        if (authUser && id === authUser.id) {
+          storeMyAvatarLocally(token);
+          patchAvatars("me");
+        } else if (token !== before) {
+          patchAvatars(id);
+        }
+      });
+    }, failed);
+  }
+
+  // Square-crops the middle of a picked photo and shrinks it to a JPEG small enough to live in a
+  // profile row (AVATAR_PHOTO_BUDGET), stepping size and quality down until it fits.
+  function shrinkAvatarPhoto(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const side = Math.min(img.naturalWidth, img.naturalHeight);
+        if (!side) { reject(new Error("empty")); return; }
+        const sx = (img.naturalWidth - side) / 2;
+        const sy = (img.naturalHeight - side) / 2;
+        let size = 192, quality = 0.82, out = "";
+        for (let i = 0; i < 5; i++) {
+          const canvas = document.createElement("canvas");
+          canvas.width = canvas.height = size;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#141B20"; // a transparent PNG would otherwise turn black in JPEG
+          ctx.fillRect(0, 0, size, size);
+          ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+          out = canvas.toDataURL("image/jpeg", quality);
+          if (out.length <= AVATAR_PHOTO_BUDGET) break;
+          size = Math.round(size * 0.85);
+          quality = Math.max(0.6, quality - 0.06);
+        }
+        if (out.length <= AVATAR_PHOTO_BUDGET && parseAvatar(out)) resolve(out);
+        else reject(new Error("too-big"));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("decode")); };
+      img.src = url;
+    });
+  }
+
+  function avatarDraftFrom(token) {
+    const a = parseAvatar(token);
+    const draft = {
+      mode: "suit", photo: null, suit: "spade", style: "plain",
+      count: 2, hand: [{ rank: "A", suit: "spade" }, { rank: "K", suit: "heart" }], slot: 0,
+      busy: false, photoBusy: false, error: "",
+    };
+    if (a && a.kind === "photo") { draft.mode = "photo"; draft.photo = a.photo; }
+    if (a && a.kind === "suit") { draft.suit = a.suit; draft.style = a.style; }
+    if (a && a.kind === "cards") {
+      draft.mode = "cards";
+      draft.count = a.cards.length;
+      draft.hand = a.cards.concat(draft.hand.slice(a.cards.length));
+    }
+    return draft;
+  }
+  function avatarFromDraft(d) {
+    if (d.mode === "photo") return { kind: "photo", photo: d.photo };
+    if (d.mode === "suit") return { kind: "suit", suit: d.suit, style: d.style };
+    return { kind: "cards", cards: d.hand.slice(0, d.count) };
+  }
+
+  function openAvatarEditor() {
+    avatarDraft = avatarDraftFrom(myAvatarToken());
+    buildAvatarEditor();
+    document.getElementById("avatarEditor").hidden = false;
+  }
+  function closeAvatarEditor() {
+    const box = document.getElementById("avatarEditor");
+    box.hidden = true;
+    box.textContent = "";
+    avatarDraft = null;
+    avatarEditorUi = null;
+  }
+  function avatarButton(cls, text) {
+    const b = el("button", cls, text);
+    b.type = "button";
+    return b;
+  }
+  // Built once per open; syncAvatarEditor() then only flips classes and text on these same
+  // nodes, so every selection change, the switch and the card lift actually transition.
+  function buildAvatarEditor() {
+    const box = document.getElementById("avatarEditor");
+    box.textContent = "";
+    const ui = { tabs: {}, panels: {}, suitBtns: {}, styleBtns: {} };
+    const inner = el("div", "avatar-editor-in");
+
+    const head = el("div", "avatar-editor-head");
+    const back = avatarButton("back-arrow");
+    back.setAttribute("aria-label", "חזרה");
+    const backSvg = svgEl("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" });
+    backSvg.appendChild(svgEl("path", { d: "M9 5l7 7-7 7" }));
+    back.appendChild(backSvg);
+    back.addEventListener("click", closeAvatarEditor);
+    const title = el("h2", "", "תמונת פרופיל");
+    title.id = "avatarEditorTitle";
+    head.append(back, title, el("span", "avatar-editor-head-spacer"));
+
+    const preview = el("div", "avatar-editor-preview");
+    ui.preview = el("span", "");
+    preview.append(ui.preview, el("span", "avatar-editor-name", me || "אורח"));
+
+    const seg = el("div", "avatar-seg");
+    seg.setAttribute("role", "tablist");
+    [["photo", "תמונה"], ["suit", "צורה"], ["cards", "קלפים"]].forEach(([mode, label]) => {
+      const b = avatarButton("", label);
+      b.setAttribute("role", "tab");
+      b.addEventListener("click", () => {
+        if (!avatarDraft || avatarDraft.mode === mode) return;
+        avatarDraft.mode = mode;
+        avatarDraft.error = "";
+        syncAvatarEditor(true);
+      });
+      ui.tabs[mode] = b;
+      seg.appendChild(b);
+    });
+
+    // photo
+    const photo = el("div", "avatar-panel");
+    ui.photoPick = el("label", "avatar-photo-btn");
+    ui.photoPick.tabIndex = 0;
+    ui.photoPick.setAttribute("role", "button");
+    const photoSvg = svgEl("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" });
+    photoSvg.appendChild(svgEl("rect", { x: "3", y: "5", width: "18", height: "14", rx: "2.5" }));
+    photoSvg.appendChild(svgEl("circle", { cx: "9", cy: "10.5", r: "1.8" }));
+    photoSvg.appendChild(svgEl("path", { d: "M21 16l-5-5-8 8" }));
+    ui.photoLabel = el("span", "");
+    const file = document.createElement("input");
+    file.type = "file";
+    file.accept = "image/*";
+    file.addEventListener("change", () => {
+      const picked = file.files && file.files[0];
+      file.value = ""; // picking the same file again must still fire
+      if (picked) pickAvatarPhoto(picked);
+    });
+    ui.photoPick.append(photoSvg, ui.photoLabel, file);
+    ui.photoPick.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); }
+    });
+    ui.photoRemove = avatarButton("avatar-remove", "הסר תמונה");
+    ui.photoRemove.addEventListener("click", () => { avatarDraft.photo = null; syncAvatarEditor(); });
+    photo.append(ui.photoPick, el("p", "avatar-hint", "התמונה נחתכת לעיגול ומוקטנת. אפשר להחליף בכל רגע."), ui.photoRemove);
+
+    // suit: the four shapes, then the chosen shape in each of the four styles
+    const suit = el("div", "avatar-panel");
+    const suitGrid = el("div", "avatar-grid4");
+    AVATAR_SUITS.forEach(s => {
+      const b = avatarButton("avatar-suit-btn");
+      b.setAttribute("aria-label", AVATAR_SUIT_NAMES[s]);
+      const svg = svgEl("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" });
+      svg.appendChild(svgEl("path", { d: AVATAR_SUIT_PATHS[s] }));
+      b.appendChild(svg);
+      b.addEventListener("click", () => { avatarDraft.suit = s; syncAvatarEditor(); });
+      ui.suitBtns[s] = b;
+      suitGrid.appendChild(b);
+    });
+    ui.styleTitle = el("p", "avatar-label", "");
+    const styleGrid = el("div", "avatar-grid4");
+    AVATAR_STYLES.forEach(([key, label]) => {
+      const b = avatarButton("avatar-style-btn");
+      const slot = el("span", "");
+      b.append(slot, el("span", "", label));
+      b.addEventListener("click", () => { avatarDraft.style = key; syncAvatarEditor(); });
+      ui.styleBtns[key] = { btn: b, slot };
+      styleGrid.appendChild(b);
+    });
+    suit.append(suitGrid, ui.styleTitle, styleGrid);
+
+    // cards: a switch for one/two, the card(s) themselves to pick which one to edit, then rank+suit
+    const cards = el("div", "avatar-panel");
+    ui.twoRow = avatarButton("avatar-switch-row");
+    ui.twoRow.setAttribute("role", "switch");
+    const twoText = el("span", "");
+    ui.twoSub = el("span", "avatar-switch-sub", "");
+    twoText.append(el("span", "avatar-switch-title", "שני קלפים"), ui.twoSub);
+    ui.twoKnob = el("span", "switch");
+    ui.twoKnob.setAttribute("aria-hidden", "true");
+    ui.twoRow.append(twoText, ui.twoKnob);
+    ui.twoRow.addEventListener("click", () => {
+      avatarDraft.count = avatarDraft.count === 2 ? 1 : 2;
+      avatarDraft.slot = 0;
+      syncAvatarEditor();
+    });
+    const cardRow = el("div", "avatar-cards");
+    ui.cardBtns = [0, 1].map(i => {
+      const b = avatarButton("avatar-card-btn");
+      const rank = el("b", "");
+      const glyph = el("i", "");
+      b.append(rank, glyph);
+      b.addEventListener("click", () => { avatarDraft.slot = i; syncAvatarEditor(); });
+      cardRow.appendChild(b);
+      return { btn: b, rank, glyph };
+    });
+    ui.cardHint = el("p", "avatar-hint", "");
+    const rankGrid = el("div", "avatar-grid7");
+    ui.rankBtns = AVATAR_RANKS.map(r => {
+      const b = avatarButton("avatar-pick", r);
+      b.addEventListener("click", () => setAvatarDraftCard({ rank: r }));
+      rankGrid.appendChild(b);
+      return [r, b];
+    });
+    const cardSuitGrid = el("div", "avatar-grid4");
+    ui.cardSuitBtns = AVATAR_SUITS.map(s => {
+      const b = avatarButton("avatar-pick suit", AVATAR_SUIT_GLYPHS[s]);
+      b.setAttribute("aria-label", AVATAR_SUIT_NAMES[s]);
+      b.addEventListener("click", () => setAvatarDraftCard({ suit: s }));
+      cardSuitGrid.appendChild(b);
+      return [s, b];
+    });
+    cards.append(ui.twoRow, cardRow, ui.cardHint, rankGrid, cardSuitGrid);
+
+    ui.error = el("p", "avatar-error", "");
+    ui.note = el("p", "avatar-hint", "בלי חשבון התמונה נשמרת רק במכשיר הזה.");
+    ui.save = avatarButton("btn-primary btn-fill avatar-save", "שמור");
+    ui.save.addEventListener("click", saveAvatarDraft);
+    ui.panels = { photo, suit, cards };
+    inner.append(head, preview, seg, photo, suit, cards, ui.error, ui.note, ui.save);
+    box.appendChild(inner);
+    avatarEditorUi = ui;
+    syncAvatarEditor(false);
+  }
+  function setAvatarDraftCard(patch) {
+    const d = avatarDraft;
+    if (!d) return;
+    const slot = d.count === 2 ? d.slot : 0;
+    d.hand = d.hand.map((c, i) => i === slot ? Object.assign({}, c, patch) : c);
+    syncAvatarEditor();
+  }
+  function syncAvatarEditor(modeChanged) {
+    const d = avatarDraft, ui = avatarEditorUi;
+    if (!d || !ui) return;
+    const pressed = (node, on) => { node.classList.toggle("on", on); node.setAttribute("aria-pressed", String(on)); };
+
+    ui.preview.textContent = "";
+    ui.preview.appendChild(d.mode === "photo" && !d.photo
+      ? renderEmptyPhotoAvatar(100)
+      : renderAvatarEl(formatAvatar(avatarFromDraft(d)), 100, me || ""));
+    Object.keys(ui.tabs).forEach(m => {
+      ui.tabs[m].classList.toggle("on", d.mode === m);
+      ui.tabs[m].setAttribute("aria-selected", String(d.mode === m));
+    });
+    Object.keys(ui.panels).forEach(m => {
+      const panel = ui.panels[m];
+      panel.hidden = d.mode !== m;
+      if (modeChanged && d.mode === m) {
+        panel.classList.remove("avatar-panel-in");
+        void panel.offsetWidth; // restart the entrance
+        panel.classList.add("avatar-panel-in");
+      }
+    });
+
+    ui.photoLabel.textContent = d.photoBusy ? "מכין את התמונה…" : d.photo ? "החלף תמונה" : "בחרו תמונה מהמכשיר";
+    ui.photoPick.classList.toggle("busy", d.photoBusy);
+    ui.photoRemove.hidden = !d.photo;
+
+    AVATAR_SUITS.forEach(s => pressed(ui.suitBtns[s], d.suit === s));
+    ui.styleTitle.textContent = "העיצוב של ה" + AVATAR_SUIT_NAMES[d.suit];
+    AVATAR_STYLES.forEach(([key]) => {
+      const s = ui.styleBtns[key];
+      pressed(s.btn, d.style === key);
+      s.slot.textContent = "";
+      s.slot.appendChild(renderAvatarEl(formatAvatar({ kind: "suit", suit: d.suit, style: key }), 52, ""));
+    });
+
+    const two = d.count === 2;
+    const slot = two ? d.slot : 0;
+    ui.twoRow.setAttribute("aria-checked", String(two));
+    ui.twoKnob.classList.toggle("on", two);
+    ui.twoSub.textContent = two ? "היד האהובה שלך" : "כבוי — קלף אחד";
+    ui.cardBtns.forEach((c, i) => {
+      const card = d.hand[i];
+      c.btn.hidden = i >= d.count;
+      c.rank.textContent = card.rank;
+      c.glyph.textContent = AVATAR_SUIT_GLYPHS[card.suit];
+      c.btn.classList.toggle("red", isRedSuit(card.suit));
+      pressed(c.btn, i === slot);
+      c.btn.setAttribute("aria-label", "קלף " + (i + 1) + ": " + card.rank + " " + AVATAR_SUIT_NAMES[card.suit]);
+    });
+    ui.cardHint.textContent = two ? "לחצו על קלף כדי לשנות אותו" : "בחרו דרגה וסדרה";
+    ui.rankBtns.forEach(([r, b]) => pressed(b, d.hand[slot].rank === r));
+    ui.cardSuitBtns.forEach(([s, b]) => pressed(b, d.hand[slot].suit === s));
+
+    ui.error.textContent = d.error;
+    ui.error.hidden = !d.error;
+    ui.note.hidden = !!authUser;
+    ui.save.disabled = d.busy || d.photoBusy || !formatAvatar(avatarFromDraft(d));
+    ui.save.textContent = d.busy ? "שומר…" : "שמור";
+  }
+  function pickAvatarPhoto(file) {
+    const draft = avatarDraft;
+    if (!draft) return;
+    draft.photoBusy = true;
+    draft.error = "";
+    syncAvatarEditor();
+    shrinkAvatarPhoto(file).then(url => {
+      if (avatarDraft !== draft) return;
+      draft.photo = url;
+      draft.photoBusy = false;
+      syncAvatarEditor();
+    }, () => {
+      if (avatarDraft !== draft) return;
+      draft.photoBusy = false;
+      draft.error = "לא הצלחנו לקרוא את התמונה. נסו תמונה אחרת.";
+      syncAvatarEditor();
+    });
+  }
+  // Signed in: the profiles row is the truth (friends read it from there), and only a confirmed
+  // write updates this device's copy. No account: this device is all there is.
+  function saveAvatarDraft() {
+    const draft = avatarDraft;
+    if (!draft || draft.busy) return;
+    const token = formatAvatar(avatarFromDraft(draft));
+    if (!token) return;
+    const finish = () => {
+      storeMyAvatarLocally(token);
+      closeAvatarEditor();
+      patchAvatars("me");
+    };
+    if (!supabase || !authUser) return finish();
+    const owner = authUser.id;
+    const failed = () => {
+      if (avatarDraft !== draft) return;
+      draft.busy = false;
+      draft.error = "לא הצלחנו לשמור. בדקו את החיבור ונסו שוב.";
+      syncAvatarEditor();
+    };
+    draft.busy = true;
+    draft.error = "";
+    syncAvatarEditor();
+    supabase.from("profiles").update({ avatar_url: token }).eq("id", owner).then(({ error }) => {
+      if (error) { failed(); return; }
+      avatarCache.set(owner, { token, at: Date.now() });
+      if (avatarDraft === draft) finish();
+      else { storeMyAvatarLocally(token); patchAvatars("me"); }
+    }, failed);
+  }
+
   // ---------- settings overlay ----------
   function loadContact() {
     try { return JSON.parse(localStorage.getItem(CONTACT_KEY)) || {}; } catch (e) { return {}; }
@@ -10873,7 +11585,7 @@
   }
 
   function refreshSettings() {
-    document.getElementById("setAvatar").textContent = me ? me.trim()[0] : "?";
+    mountMyAvatar(document.getElementById("setAvatar"), 84);
     document.getElementById("setName").textContent = me || "אורח";
     // The signed-in address sits under the name so "התנתקות" below is unambiguous about what
     // it disconnects. Local-only play shows nothing here.
@@ -10932,14 +11644,19 @@
   }
   function saveContact() {
     if (isGoogleAccount(authUser)) return; // the pencil is hidden for them; this is the belt
-    try {
-      localStorage.setItem(CONTACT_KEY, JSON.stringify({
-        phone: document.getElementById("setPhone").value.trim(),
-        email: document.getElementById("setEmail").value.trim(),
-      }));
-    } catch (e) {}
+    writeContact({
+      phone: document.getElementById("setPhone").value.trim(),
+      email: document.getElementById("setEmail").value.trim(),
+    });
     setContactEditing = false;
     refreshContact();
+  }
+  // The one writer of the contact record. Merged, not replaced: the same record also carries
+  // this device's copy of the profile picture (storeMyAvatarLocally).
+  function writeContact(patch) {
+    try {
+      localStorage.setItem(CONTACT_KEY, JSON.stringify(Object.assign(loadContact(), patch)));
+    } catch (e) {}
   }
   document.getElementById("setContactEdit").addEventListener("click", () => {
     if (isGoogleAccount(authUser)) return;
@@ -10963,6 +11680,7 @@
   document.getElementById("setBackBtn").addEventListener("click", () => {
     document.getElementById("settings").hidden = true;
   });
+  document.getElementById("setAvatar").addEventListener("click", openAvatarEditor);
   document.getElementById("setThemeSwitch").addEventListener("click", () => {
     toggleTheme();
     refreshSettings();
