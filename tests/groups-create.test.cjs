@@ -100,12 +100,12 @@ test('createGroup requires a signed-in name, otherwise it opens the login screen
   assert.match(source, /if \(!me\) \{ showLogin\(\); return; \}/);
 });
 
-test('createGroup pushes a Group and an admin GroupMember, then saves and opens the group', () => {
+test('createGroup pushes a Group and an admin GroupMember, then saves and opens its card in place', () => {
   const source = sourceBetween('  function createGroup(', '  function resetCreateGroupPanel(');
   assert.match(source, /state\.groups\.push\(group\)/);
   assert.match(source, /state\.groupMembers\.push\(member\)/);
   assert.match(source, /save\(\);/);
-  assert.match(source, /openGroup\(group\.id\)/);
+  assert.match(source, /expandedGroupId = group\.id;/);
   assert.match(source, /buildGroupCreation\(/);
 });
 
@@ -134,17 +134,21 @@ test('the group view reuses the games dashboard shell and hides the game/settle 
 // closure so the card always shows its press state before actions.onOpen runs — strengthened
 // here to also assert the keyboard path reuses that same closure, which the old direct-call
 // assertion couldn't express.
-test('the group card row opens its preview and is keyboard-accessible, without an expand control', () => {
+test('the group card row opens in place on the dashboard (the preview only for archived cards) and is keyboard-accessible', () => {
   const source = sourceBetween('  function renderGroupCard(group, actions) {', '  function renderGroupsSection(');
   assert.match(source, /head\.setAttribute\("role", "button"\)/);
   assert.match(source, /head\.setAttribute\("tabindex", "0"\)/);
-  assert.match(source, /const activate = \(\) => pressThenOpen\(card, actions\.onOpen\)/);
+  assert.match(source, /if \(actions\.onToggle\) head\.setAttribute\("aria-expanded", String\(expanded\)\);/);
+  assert.match(source, /\? \(\) => \(expanded \? actions\.onToggle\(\) : pressThenOpen\(card, actions\.onToggle\)\)/);
+  assert.match(source, /: \(\) => pressThenOpen\(card, actions\.onOpen\);/);
   assert.match(source, /head\.addEventListener\("click", activate\)/);
   assert.match(source, /if \(e\.key === "Enter" \|\| e\.key === " "\) \{ e\.preventDefault\(\); activate\(\); \}/);
   assert.doesNotMatch(source, /games-card-toggle/);
-  assert.doesNotMatch(source, /הרחב/);
+
   const sectionSource = sourceBetween('  function renderGroupsSection(', '  function renderArchivedGroupsSection(');
-  assert.match(sectionSource, /onOpen: \(\) => openGroupPreview\(groupId\)/);
+  assert.match(sectionSource, /onToggle: \(\) => toggleGroupCard\(groupId\)/);
+  const archived = sourceBetween('  function renderArchivedGroupsSection(', '  function closeArchivedGroups()');
+  assert.match(archived, /onOpen: \(\) => openGroupPreview\(groupId\)/);
 });
 
 // ---------- group card press + layout (owner ask: animate on tap, count beside the name) ----------

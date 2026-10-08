@@ -56,10 +56,21 @@ test('the active-game card toggle label is "כווץ" when expanded and "הרח�
   assert.match(activeCardSource, /actions\.expanded \? "כווץ" : "הרחב"/);
 });
 
-test('the group card has no expand control or hidden details', () => {
+test('the group card opens in place: no "הרחב" toggle button, its body comes from renderGroupCardBody', () => {
+  // 2026-10-08 owner ask: a tap on the card itself opens it; there is still no separate toggle.
   assert.doesNotMatch(groupCardSource, /games-card-toggle/);
   assert.doesNotMatch(groupCardSource, /games-card-details/);
-  assert.doesNotMatch(groupCardSource, /הרחב/);
+  assert.match(groupCardSource, /if \(actions\.onToggle\) card\.appendChild\(renderGroupCardBody\(group, expanded\)\);/);
+});
+
+test('the open group card carries invite, table, details and settings, then the members one under another', () => {
+  const body = sourceBetween('  function renderGroupCardBody(group, expanded) {', '  // Collapsed "ארכיון');
+  assert.match(body, /groupActionButton\("invite", "צרף חבר", \(\) => shareGroupInvite\(group\)\)/);
+  assert.match(body, /groupActionButton\("table", "פתח שולחן", \(\) => \{ currentGroupId = groupId; toggleStartGamePanel\(\); \}, "primary"\)/);
+  assert.match(body, /groupActionButton\("details", "פירוט", \(\) => \{ resetStartGamePanel\(\); openGroupPreview\(groupId\); \}\)/);
+  assert.match(body, /groupActionButton\("settings", "הגדרות", \(\) => \{ currentGroupId = groupId; openGroupSettings\(\); \}\)/);
+  assert.match(body, /activeMembers\(collections\.groupMembers, groupId\)/);
+  assert.ok(body.indexOf('"games-group-actions"') < body.indexOf('"games-group-players"'), 'buttons sit above the member list');
 });
 
 // ---------- quick actions: only the standalone-game action remains ----------
