@@ -1009,7 +1009,6 @@
   .fr-seat.mine { border: 1px solid var(--accent); color: var(--accent); background: var(--avatar-tint); }
   .fr-seat.open { border: 1px dashed var(--faint); color: var(--faint); transition: border-color .3s, color .3s; }
   .fr-seat.open.lit { border-color: var(--accent); color: var(--accent); }
-  .fr-tag { display: inline-block; height: 22px; padding: 0 10px; border-radius: 999px; font: 600 12px/22px Heebo, sans-serif; color: var(--accent-fill); background: color-mix(in srgb, var(--accent) 10%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); }
   .friends-empty .friends-label { align-self: stretch; margin: 18px 0 8px; text-align: start; }
   .friends-empty .friends-list { align-self: stretch; }
   .fr-cta {
@@ -1786,7 +1785,7 @@
         </div>
       </div>
     </div>
-    <p class="empty-note" style="margin-top:6px">גרסה 144</p>
+    <p class="empty-note" style="margin-top:6px">גרסה 145</p>
     <p class="legal-links"><a href="./privacy.html" target="_blank" rel="noopener">פרטיות</a> · <a href="./terms.html" target="_blank" rel="noopener">תנאי שימוש</a></p>
   </div>
 </div>
@@ -10989,7 +10988,7 @@
       seat.textContent = "?";
       frPaint(mineA, FR_HANDS[0][0], FR_HANDS[0][1]);
       frPaint(mineB, FR_HANDS[0][2], FR_HANDS[0][3]);
-      wrap.append(stage, el("span", "fr-tag", "מקום פנוי"));
+      wrap.append(stage); // owner, 2026-10-08: no caption under the scene
       frHero = { wrap, stage, seat, mySeat, cards: [mineA, mineB, backA, backB], running: false };
     }
     frHero.mySeat.textContent = String(me || "").trim().charAt(0) || "?";

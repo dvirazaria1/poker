@@ -249,7 +249,7 @@ test('the open-seat scene: your hand face up, an empty seat dealt two face-down 
   const hero = sourceBetween('  // ---------- Friends, empty: an open seat across the table', '  // No friends and no requests:');
   assert.match(hero, /let frHero = null;/);
   assert.match(hero, /stage\.setAttribute\("aria-hidden", "true"\);/);
-  assert.match(hero, /el\("span", "fr-tag", "מקום פנוי"\)/);
+  assert.doesNotMatch(html, /fr-tag|מקום פנוי/, 'owner: no caption under the scene');
   assert.match(hero, /matchMedia\("\(prefers-reduced-motion: reduce\)"\)\.matches/);
   assert.match(hero, /if \(!frAlive\(hero\)\) \{ hero\.running = false; return; \}/);
   assert.match(hero, /const FR_HANDS = \[/);
