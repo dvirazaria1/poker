@@ -1,0 +1,10 @@
+{
+  "appId": "il.co.dvirazria.kupa",
+  "appName": "סוגרים קופה",
+  "webDir": "www",
+  "backgroundColor": "#05070A",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#05070A"
+  }
+}

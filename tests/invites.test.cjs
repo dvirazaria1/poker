@@ -128,6 +128,11 @@ test('inviteLink never sends another phone to this device loopback address', () 
     vm.runInContext(`inviteLink('ABCDEFGH', 'http://localhost:8765', '/')`, context),
     'https://poker-tau-pink.vercel.app/?join=ABCDEFGH'
   );
+  // The iOS app shell serves the page from capacitor://localhost.
+  assert.equal(
+    vm.runInContext(`inviteLink('ABCDEFGH', 'capacitor://localhost', '/')`, context),
+    'https://poker-tau-pink.vercel.app/?join=ABCDEFGH'
+  );
   assert.equal(
     vm.runInContext(`inviteLink('ABCDEFGH', 'https://preview.example.com', '/')`, context),
     'https://preview.example.com/?join=ABCDEFGH'
