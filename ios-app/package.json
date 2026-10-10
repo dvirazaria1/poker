@@ -1,0 +1,17 @@
+{
+  "name": "kupa-ios",
+  "private": true,
+  "description": "iOS shell (Capacitor) for סוגרים קופה -- bundles the generated web app from the repo root.",
+  "scripts": {
+    "web": "node sync-web.mjs",
+    "sync": "node sync-web.mjs && npx cap sync ios",
+    "open": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "^8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.3"
+  }
+}

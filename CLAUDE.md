@@ -10,6 +10,7 @@ Read [`HANDOFF.md`](HANDOFF.md) and [`DESIGN.md`](DESIGN.md) before making chang
 - `sw.js`: hand-maintained service-worker cache list. `build.py` only regex-replaces the cache-name constant inside it; the file itself is not regenerated. Never hand-edit the cache version string.
 - `manifest.webmanifest`, `icon-180.png`, `icon-192.png`, `icon-512.png`: PWA metadata/assets.
 - `poker-settle.html`: frozen legacy artifact. Do not edit.
+- `ios-app/`: the iOS App Store shell (Capacitor, Swift Package Manager). `npm run sync` there copies the built web app into `www/` and the Xcode project; `npm run open` opens Xcode. `www/`, `node_modules/` and `ios/App/App/public/` are generated and git-ignored. Excluded from the Vercel deploy.
 - `tests/*.test.cjs`: Node built-in tests run against source slices with `vm` (228 tests across 20 files).
 - `tools/local-state-to-sql.js`: offline converter, `poker-settle-v1` export → Postgres inserts. Not part of the app; excluded from the Vercel deploy via `.vercelignore`.
 - `docs/backend/`: portable backend artifacts (platform decision, schema, RLS, migration plan, frontend seam) — see `docs/backend-readiness.md` for the narrative summary.
