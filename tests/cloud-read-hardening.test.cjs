@@ -167,3 +167,15 @@ test('a closed game created by someone else is never re-sent as a shell, childre
   assert.match(push, /return !frozen\.has\(gameId\) && !foreignClosed\.has\(gameId\);/, 'no children or debts');
   assert.match(push, /\(next\[pair\[0\]\] \|\| \[\]\)\s*\.filter\(row => !foreignClosed\.has\(String\(row\.id\)\)\)/, 'no close');
 });
+
+test('a group someone else created is never inserted from here, nor its members or invites, and a pull that no longer shows it lets it go', () => {
+  // 2026-10-10: a group deleted by its creator is hidden from its members by groups_select_members;
+  // the phone kept it as an unsynced local group and every push was refused (42501, set aside).
+  const push = fn('pushCloudRun');
+  assert.match(push, /const foreignGroups = cloudForeignGroupIds\(next\.groups, new Set\(\(previous\.groups \|\| \[\]\)\.map\(row => String\(row\.id\)\)\), pushAccountId\);/);
+  assert.match(push, /const groupKey = \{ groups: "id", groupMembers: "group_id", invites: "group_id" \}\[pair\[0\]\];/);
+  assert.match(push, /\.filter\(row => !groupKey \|\| !foreignGroups\.has\(String\(row\[groupKey\]\)\)\)/);
+  const apply = fn('applyCloudPull');
+  assert.match(apply, /const dropGroupIds = Array\.from\(cloudForeignGroupIds\(buildCloudRows\(cloudCollections\(\), cloudContext\(\)\)\.groups,\s*new Set\(groupRows\.map\(row => String\(row && row\.id\)\)\), authUser\.id\)\);/);
+  assert.match(apply, /mergeCloudIntoState\(state, pulled, \{ keepLocalIds: cloudKeepLocalIds\(\), dropGroupIds \}\)/);
+});

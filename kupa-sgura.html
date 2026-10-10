@@ -3022,6 +3022,10 @@
     const knownGameIds = new Set((previous.games || []).map(row => String(row.id))
       .concat((previous.gamesClosed || []).map(row => String(row.id))));
     const foreignClosed = cloudForeignClosedGameIds(next.gamesClosed, knownGameIds, pushAccountId);
+    // The same for a group somebody else created that the server is not showing me (the first push
+    // after boot knows nothing yet, or its creator deleted it): groups_insert_self refuses it, and
+    // its members and invites with it. It waits for a pull, which either knows it or lets it go.
+    const foreignGroups = cloudForeignGroupIds(next.groups, new Set((previous.groups || []).map(row => String(row.id))), pushAccountId);
     const notFrozen = row => {
       const gameId = String(row.game_id || row.id || "");
       return !frozen.has(gameId) && !foreignClosed.has(gameId);
@@ -3040,10 +3044,12 @@
         // Debts are exempt from the frozen filter: they are written AFTER the close, insert-only
         // (DO NOTHING) and debts_insert_on_close allows them on a closed game -- so a debt whose
         // insert failed right after a successful close is retried instead of dropped for good.
+        const groupKey = { groups: "id", groupMembers: "group_id", invites: "group_id" }[pair[0]];
         const rows = (pair[0] === "gamesClosed"
           ? (next[pair[0]] || []).filter(row => !foreignClosed.has(String(row.id)))
           : pair[0] === "debts" ? (next[pair[0]] || []).filter(row => !foreignClosed.has(String(row.game_id)))
           : (next[pair[0]] || []).filter(notFrozen))
+          .filter(row => !groupKey || !foreignGroups.has(String(row[groupKey])))
           .filter(row => !cloudQuarantineSkips(row, quarantined));
         const diff = diffCollections(previous[pair[0]] || [], rows, "id");
         // diff.deletes is deliberately not applied here: none of the group tables has a DELETE
@@ -3523,9 +3529,14 @@
         return;
       }
     }
+    // A group somebody else created that this pull no longer shows is gone -- deleted by its
+    // creator, or I am out of it. It is not an unsynced local group, so the merge lets it go even
+    // while it is pending (a save marks every row), instead of keeping it to push forever.
+    const dropGroupIds = Array.from(cloudForeignGroupIds(buildCloudRows(cloudCollections(), cloudContext()).groups,
+      new Set(groupRows.map(row => String(row && row.id))), authUser.id));
     // Re-mirror BEFORE normalize: the singular fields still describe the table as it was, and
     // migrateGamesArray would fold a table the server just removed straight back in from them.
-    const merged = normalize(syncCurrentGameMirror(mergeCloudIntoState(state, pulled, { keepLocalIds: cloudKeepLocalIds() })));
+    const merged = normalize(syncCurrentGameMirror(mergeCloudIntoState(state, pulled, { keepLocalIds: cloudKeepLocalIds(), dropGroupIds })));
     if (merged) state = merged;
     // The baseline is what the SERVER holds, not what we now hold: a record the merge kept is
     // absent from it and goes up on the next push (that is the first-device seeding rule).
@@ -6326,10 +6337,13 @@
       if (pulled.displayName || !local.displayName) return pulled;
       return { ...pulled, displayName: local.displayName };
     };
+    // Groups the server has let go of for good (cloudForeignGroupIds): never kept, even while
+    // pending, and neither are their members or invites.
+    const drop = new Set(((options || {}).dropGroupIds || []).map(String));
     const keptGroups = localGroups.filter(g => g && g.id && !serverGroupIds.has(String(g.id))
-      && (keep.has(String(g.id)) || !!g.deletedAt));
+      && !drop.has(String(g.id)) && (keep.has(String(g.id)) || !!g.deletedAt));
     const keptGroupIds = new Set(keptGroups.map(g => String(g.id)));
-    const isKeptChild = record => !!record && !!record.id
+    const isKeptChild = record => !!record && !!record.id && !drop.has(String(record.groupId))
       && (keep.has(String(record.id)) || keptGroupIds.has(String(record.groupId)));
     const mergeKept = (pulledList, localList, mergeOne) => {
       const merged = (Array.isArray(pulledList) ? pulledList : []).map(mergeOne);
@@ -6566,6 +6580,18 @@
     (Array.isArray(closedRows) ? closedRows : []).forEach(row => {
       if (!row || row.id == null || known.has(String(row.id))) return;
       if (String(row.created_by || "") !== String(accountId || "")) out.add(String(row.id));
+    });
+    return out;
+  }
+  // The same rule for groups: groups_insert_self lets only the creator insert a group, so a group
+  // somebody else created that the server is not showing me is not an unsynced local group --
+  // its creator deleted it, or I am no longer in it. It is never sent, and a pull lets it go.
+  function cloudForeignGroupIds(groupRows, knownIds, accountId) {
+    const known = knownIds && typeof knownIds.has === "function" ? knownIds : new Set((Array.isArray(knownIds) ? knownIds : []).map(String));
+    const out = new Set();
+    (Array.isArray(groupRows) ? groupRows : []).forEach(row => {
+      if (!row || row.id == null || known.has(String(row.id))) return;
+      if (String(row.created_by_profile_id || "") !== String(accountId || "")) out.add(String(row.id));
     });
     return out;
   }

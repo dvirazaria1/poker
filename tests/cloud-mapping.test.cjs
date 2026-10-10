@@ -476,6 +476,38 @@ test('mergeCloudIntoState keeps a soft-deleted group RLS hides from the pull, an
   assert.deepEqual(merged.invites.map(i => i.id), [IV1]);
 });
 
+// A group somebody else created and then deleted (2026-10-10, "set aside: groups 42501"): RLS
+// hides a deleted group from its members, the device kept its copy as if it were an unsynced
+// local group, and every push tried to INSERT it under the creator's id.
+const GR_F = 'abababab-abab-4bab-8bab-abababababab';
+const M_F = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+const FOREIGN_GROUP = { id: GR_F, name: 'שלישי פוקר', avatarDataUrl: null,
+  createdBy: { userId: P2, guestId: P2, displayName: 'כפיר' },
+  createdAt: '2026-10-08T13:53:38.793Z', archivedAt: null, deletedAt: null };
+const FOREIGN_MEMBER = { id: M_F, groupId: GR_F, userId: P1, guestId: G1, displayName: 'דביר', role: 'member',
+  status: 'active', joinedAt: '2026-10-08T13:55:00.000Z', leftAt: null, hiddenAt: null };
+
+test('cloudForeignGroupIds names the groups this device could never insert: unknown to the server and created by somebody else', () => {
+  const context = load();
+  const rows = runJSON(`buildCloudRows(${JSON.stringify({ groups: [STATE.groups[0], FOREIGN_GROUP] })}, ${ctxLiteral}).groups`, context);
+  assert.deepEqual(rows.map(r => r.created_by_profile_id), [P1, P2]);
+  assert.deepEqual(runJSON(`Array.from(cloudForeignGroupIds(${JSON.stringify(rows)}, new Set(), '${P1}'))`, context), [GR_F]);
+  // once the server shows it, it is a known row (an admin's edit goes up as an UPDATE)
+  assert.deepEqual(runJSON(`Array.from(cloudForeignGroupIds(${JSON.stringify(rows)}, new Set(['${GR_F}']), '${P1}'))`, context), []);
+});
+
+test('mergeCloudIntoState drops a group somebody else created once the server stops showing it, with its rows', () => {
+  const context = load();
+  const local = { ...STATE, groups: STATE.groups.concat([FOREIGN_GROUP]), groupMembers: STATE.groupMembers.concat([FOREIGN_MEMBER]) };
+  const pulled = { ...PULLED, groupMembers: PULLED.groupMembers.slice(0, 1) };
+  // both ids are pending (a save marks every row), which used to keep them for good
+  const merged = runJSON(
+    `mergeCloudIntoState(${JSON.stringify(local)}, ${JSON.stringify(pulled)}, {keepLocalIds:['${GR_F}','${M_F}'], dropGroupIds:['${GR_F}']})`,
+    context);
+  assert.deepEqual(merged.groups.map(g => g.id), [GR1]);
+  assert.deepEqual(merged.groupMembers.map(m => m.id), [M1]);
+});
+
 // ---------- wiring (the non-pure half) ----------
 
 const appScript = (() => {
